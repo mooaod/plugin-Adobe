@@ -223,16 +223,70 @@ test('loads the social host workflow before listing artboards', function () {
   assert.equal(panel.bridge.calls[1], 'listArtboards(app)');
 });
 
-test('reports a social host workflow load failure without calling listArtboards', function () {
+test('generated host loader returns JSON when ExtendScript has no JSON global', function () {
   const panel = runPanel({
-    hostLoadResult: JSON.stringify({ ok: false, error: 'missing host file' })
+    cacheState: {
+      catalog: catalog(),
+      source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    }
+  });
+  const loadedPaths = [];
+  const rawResult = vm.runInNewContext(panel.bridge.calls[0], {
+    JSON: undefined,
+    File: function File(filePath) { this.filePath = filePath; },
+    $: {
+      evalFile: function (file) { loadedPaths.push(file.filePath); }
+    }
+  });
+
+  assert.doesNotMatch(panel.bridge.calls[0], /\bJSON\b/);
+  assert.deepEqual(JSON.parse(rawResult), { ok: true });
+  assert.deepEqual(loadedPaths, ['/extension root/host/social-workflow.jsx']);
+
+  const failedResult = vm.runInNewContext(panel.bridge.calls[0], {
+    JSON: undefined,
+    File: function File(filePath) { this.filePath = filePath; },
+    $: {
+      evalFile: function () { throw 'missing "host"\\path\nnext'; }
+    }
+  });
+  assert.deepEqual(JSON.parse(failedResult), {
+    ok: false,
+    error: 'missing "host"\\path\nnext'
+  });
+});
+
+test('host load failure still renders offline presets and keeps host actions guarded', function () {
+  const panel = runPanel({
+    hostLoadResult: JSON.stringify({ ok: false, error: 'missing host file' }),
+    cacheState: {
+      catalog: catalog(),
+      source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    },
+    remote: {
+      type: 'load',
+      status: 200,
+      body: JSON.stringify(catalog('1.2.0'))
+    }
   });
 
   assert.equal(panel.bridge.calls.length, 1);
+  assert.equal(panel.document.elements['preset-list'].children.length, 1);
   assert.match(panel.document.elements.status.textContent, /Could not load social workflow/);
   assert.match(panel.document.elements.status.textContent, /missing host file/);
   assert.equal(panel.document.elements['create-presets-button'].disabled, true);
   assert.equal(panel.document.elements['export-button'].disabled, true);
+
+  panel.document.elements['update-presets-button'].dispatch('click');
+  assert.equal(panel.document.elements['preset-list'].children.length, 1);
+  assert.equal(panel.document.elements['create-presets-button'].disabled, true);
+  assert.equal(panel.document.elements['export-button'].disabled, true);
+
+  panel.document.elements['create-presets-button'].dispatch('click');
+  panel.document.elements['export-button'].dispatch('click');
+  assert.equal(panel.bridge.calls.length, 1);
 });
 
 test('manual update always fetches after a successful same-day check', function () {
@@ -286,7 +340,24 @@ test('failed automatic update retains and reports the valid cached catalog', fun
   assert.equal(panel.document.elements['preset-list'].children.length, 1);
   assert.match(panel.document.elements.status.textContent, /Using cached presets/);
   assert.match(panel.document.elements.status.textContent, /could not be checked/i);
-  assert.equal(panel.writes.length, 0);
+  assert.equal(panel.writes.length, 1);
+
+  const persistedState = JSON.parse(panel.writes[0].data);
+  assert.ok(persistedState.lastAttemptedCheck);
+
+  const secondPanel = runPanel({
+    cacheState: persistedState,
+    remote: { type: 'error' }
+  });
+  const secondRemoteRequests = secondPanel.requests.filter(function (request) {
+    return request.url.indexOf('https://') === 0;
+  });
+
+  assert.equal(secondRemoteRequests.length, 0);
+  secondPanel.document.elements['update-presets-button'].dispatch('click');
+  assert.equal(secondPanel.requests.filter(function (request) {
+    return request.url.indexOf('https://') === 0;
+  }).length, 1);
 });
 
 test('HTML loads catalog and export model before the panel controller', function () {

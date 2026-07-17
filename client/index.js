@@ -21,6 +21,8 @@
   var artboards = [];
   var presetCheckboxes = [];
   var artboardCheckboxes = [];
+  var hostReady = false;
+  var hostLoadError = '';
   var cachedState = readCache();
 
   function setStatus(message) {
@@ -56,7 +58,7 @@
     }
   }
 
-  function writeCache(catalog, checkedAt) {
+  function persistCache(catalog, successfulAt, attemptedAt) {
     var userData;
     var directory;
     var value;
@@ -68,15 +70,32 @@
       directory = userData + '/' + CACHE_DIRECTORY;
       value = {
         catalog: catalog,
-        source: 'cache',
-        lastSuccessfulCheck: checkedAt
+        source: 'cache'
       };
+      if (successfulAt) {
+        value.lastSuccessfulCheck = successfulAt;
+      }
+      if (attemptedAt) {
+        value.lastAttemptedCheck = attemptedAt;
+      }
       window.cep.fs.makedir(directory);
       window.cep.fs.writeFile(directory + '/' + CACHE_FILENAME, JSON.stringify(value));
       cachedState = value;
     } catch (error) {
       // A cache failure must not interrupt preset creation or export.
     }
+  }
+
+  function writeCache(catalog, checkedAt) {
+    persistCache(catalog, checkedAt, cachedState && cachedState.lastAttemptedCheck);
+  }
+
+  function recordAutomaticAttempt(attemptedAt) {
+    persistCache(
+      activeCatalog,
+      cachedState && cachedState.lastSuccessfulCheck,
+      attemptedAt
+    );
   }
 
   function catalogDescription() {
@@ -91,6 +110,16 @@
     var sourceLabel = catalogSource === 'cache' ? 'cached' : catalogSource;
     return 'Using ' + sourceLabel + ' presets (v' + activeCatalog.catalogVersion + ').' +
       (extra ? ' ' + extra : '');
+  }
+
+  function hostFailureMessage(extra) {
+    return 'Could not load social workflow: ' + hostLoadError +
+      (activeCatalog ? ' Offline presets remain available to view.' : '') +
+      (extra ? ' ' + extra : '');
+  }
+
+  function updateCreateState() {
+    createButton.disabled = !hostReady || selectedPresets().length === 0;
   }
 
   function renderCatalog(catalog, source) {
@@ -115,7 +144,7 @@
       presetList.appendChild(label);
       presetCheckboxes.push(checkbox);
     }
-    createButton.disabled = catalog.presets.length === 0;
+    updateCreateState();
     catalogInfo.textContent = catalogDescription();
   }
 
@@ -147,6 +176,10 @@
   function updateExportState() {
     var selected = selectedArtboards();
     var collisions = findFilenameCollisions(selected, formatSelect.value);
+    if (!hostReady) {
+      exportButton.disabled = true;
+      return;
+    }
     if (collisions.length) {
       collisionWarning.textContent = 'Filename collision: ' + collisions.join(', ');
       exportButton.disabled = true;
@@ -213,36 +246,61 @@
     try {
       extensionPath = csInterface.getSystemPath(SystemPath.EXTENSION).replace(/[\\\/]$/, '');
       workflowPath = extensionPath + '/host/social-workflow.jsx';
-      expression = '(function(){try{$.evalFile(new File(' + JSON.stringify(workflowPath) +
-        '));return JSON.stringify({ok:true});}catch(error){return JSON.stringify({ok:false,error:String(error)});}}())';
+      expression = '(function(){function escapeJson(value){return String(value)' +
+        '.replace(/\\\\/g,"\\\\\\\\").replace(/"/g,"\\\\\\\"")' +
+        '.replace(/\\r/g,"\\\\r").replace(/\\n/g,"\\\\n").replace(/\\t/g,"\\\\t");}' +
+        'try{$.evalFile(new File(' + extendScriptString(workflowPath) +
+        '));return \'{"ok":true}\';}catch(error){return \'{"ok":false,"error":"\' +' +
+        'escapeJson(error) + \'"}\';}}())';
       csInterface.evalScript(expression, function (rawResult) {
         var result = parseHostResult(rawResult);
         if (!result.ok) {
-          createButton.disabled = true;
-          exportButton.disabled = true;
-          setStatus('Could not load social workflow: ' + result.error);
+          hostLoadError = result.error;
+          updateCreateState();
+          updateExportState();
+          setStatus(hostFailureMessage());
           return;
         }
+        hostReady = true;
+        hostLoadError = '';
+        updateCreateState();
+        updateExportState();
         onReady();
       });
     } catch (error) {
-      createButton.disabled = true;
-      exportButton.disabled = true;
-      setStatus('Could not load social workflow: ' + error.message);
+      hostLoadError = error.message;
+      updateCreateState();
+      updateExportState();
+      setStatus(hostFailureMessage());
     }
+  }
+
+  function extendScriptString(value) {
+    return "'" + String(value)
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/\r/g, '\\r')
+      .replace(/\n/g, '\\n')
+      .replace(/\u2028/g, '\\u2028')
+      .replace(/\u2029/g, '\\u2029') + "'";
   }
 
   function remoteFailure() {
     updateButton.disabled = false;
-    if (activeCatalog) {
+    if (hostLoadError) {
+      setStatus(hostFailureMessage('Preset updates could not be checked.'));
+    } else if (activeCatalog) {
       setStatus(usingCatalogMessage('Preset updates could not be checked.'));
     } else {
       setStatus('Preset updates could not be checked and no valid offline catalog is available.');
     }
   }
 
-  function checkRemoteCatalog() {
+  function checkRemoteCatalog(isAutomatic) {
     var request;
+    if (isAutomatic) {
+      recordAutomaticAttempt(new Date().toISOString());
+    }
     if (CATALOG_URL.indexOf('https://') !== 0) {
       remoteFailure();
       return;
@@ -271,7 +329,9 @@
       renderCatalog(validated.catalog, 'remote');
       writeCache(validated.catalog, new Date().toISOString());
       updateButton.disabled = false;
-      setStatus('Preset catalog updated to ' + validated.catalog.catalogVersion + '.');
+      setStatus(hostLoadError
+        ? hostFailureMessage('Preset catalog updated to ' + validated.catalog.catalogVersion + '.')
+        : 'Preset catalog updated to ' + validated.catalog.catalogVersion + '.');
     };
     request.onerror = remoteFailure;
     request.send(null);
@@ -286,14 +346,15 @@
     );
     if (selected) {
       renderCatalog(selected, cachedValidation.ok ? 'cache' : 'bundled');
-      setStatus(usingCatalogMessage());
+      setStatus(hostLoadError ? hostFailureMessage() : usingCatalogMessage());
     } else {
       createButton.disabled = true;
       catalogInfo.textContent = 'No valid presets available';
       setStatus('No valid offline preset catalog is available.');
     }
-    if (shouldCheckToday(cachedState && cachedState.lastSuccessfulCheck, new Date())) {
-      checkRemoteCatalog();
+    if (shouldCheckToday(cachedState &&
+        (cachedState.lastAttemptedCheck || cachedState.lastSuccessfulCheck), new Date())) {
+      checkRemoteCatalog(true);
     }
   }
 
@@ -345,6 +406,11 @@
 
   createButton.addEventListener('click', function () {
     var presets = selectedPresets();
+    if (!hostReady) {
+      updateCreateState();
+      setStatus(hostLoadError ? hostFailureMessage() : 'Social workflow is not ready yet.');
+      return;
+    }
     if (!presets.length) {
       setStatus('Select at least one preset to create.');
       return;
@@ -353,7 +419,7 @@
     setStatus('Creating selected presets…');
     csInterface.evalScript('createPresetArtboards(app, ' + JSON.stringify(presets) + ')', function (rawResult) {
       var result = parseHostResult(rawResult);
-      createButton.disabled = false;
+      updateCreateState();
       if (!result.ok) {
         setStatus(result.error);
         return;
@@ -368,6 +434,11 @@
     var collisions = findFilenameCollisions(selected, formatSelect.value);
     var indexes = [];
     var i;
+    if (!hostReady) {
+      updateExportState();
+      setStatus(hostLoadError ? hostFailureMessage() : 'Social workflow is not ready yet.');
+      return;
+    }
     if (collisions.length) {
       updateExportState();
       return;
@@ -393,12 +464,12 @@
     });
   });
 
-  updateButton.addEventListener('click', checkRemoteCatalog);
+  updateButton.addEventListener('click', function () {
+    checkRemoteCatalog(false);
+  });
   formatSelect.addEventListener('change', updateExportState);
   destinationInput.addEventListener('input', updateExportState);
 
-  loadHostWorkflow(function () {
-    refreshArtboards();
-    loadBundledCatalog();
-  });
+  loadBundledCatalog();
+  loadHostWorkflow(refreshArtboards);
 }());
