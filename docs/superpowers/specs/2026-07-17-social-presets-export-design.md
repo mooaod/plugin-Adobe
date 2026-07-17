@@ -1,51 +1,46 @@
-# Social Presets and Export Workflow — Design
+# การสร้าง Artboard Social และ Export อัตโนมัติ — แบบออกแบบ
 
-## Outcome
+## ผลลัพธ์
 
-Extend Artboard Size Renamer into a social-media workflow tool that creates
-standard social artboards and exports them with predictable file names. Standard
-size presets update from a versioned JSON catalog hosted in GitHub; user-created
-presets are local and are never overwritten.
+ขยาย Artboard Size Renamer ให้เป็นเครื่องมือทำงาน social media ที่สร้าง
+Artboard มาตรฐานและ export ไฟล์ด้วยชื่อที่คาดเดาได้ ขนาดมาตรฐานจะอัปเดตจาก
+catalog JSON ที่มีเวอร์ชันบน GitHub ส่วน preset ที่ผู้ใช้สร้างเองจะเก็บในเครื่อง
+และไม่ถูกเขียนทับ
 
-## Users and core workflow
+## ผู้ใช้และ workflow หลัก
 
-A designer starts with one campaign artboard, opens the extension, selects a
-social preset set, and creates named artboards. They then choose which
-artboards to export, select PNG, JPG, or WebP, and export assets using
-platform-aware filenames.
+นักออกแบบเริ่มจาก Artboard ของแคมเปญ เปิด extension เลือกชุด preset social
+แล้วสร้าง Artboard ที่มีชื่อให้โดยอัตโนมัติ จากนั้นเลือก Artboard ที่จะ export,
+เลือก PNG, JPG หรือ WebP และ export โดยใช้ชื่อไฟล์ที่สอดคล้องกับแพลตฟอร์ม
 
-## Scope
+## ขอบเขตงาน
 
-- Create artboards from a built-in social preset set:
+- สร้าง Artboard จากชุด preset social ที่ติดมากับปลั๊กอิน:
   - Instagram Feed: 1080x1080 px
   - Instagram Portrait: 1080x1350 px
   - Instagram Story / Reel: 1080x1920 px
   - Facebook Post: 1200x630 px
   - YouTube Thumbnail: 1280x720 px
-- Name generated boards as `<preset-slug>_<width>x<height> px`.
-- Export selected or all artboards as PNG, JPG, or WebP.
-- Use a filename rule `<artboard-name>.<extension>` after sanitizing invalid
-  filename characters; do not prefix the Illustrator document filename.
-- Warn before export when sanitized filenames would collide.
-- Store custom presets and the cached catalog in the extension's user-data
-  directory, separate from the installed extension.
-- Bundle an offline catalog with the extension.
-- Automatically check the GitHub catalog at most once per calendar day when
-  the panel opens.
-- Include a **Check Preset Updates** control for an immediate user-initiated
-  check.
-- Download catalog data through HTTPS only; do not upload artwork, document
-  names, artboard data, or analytics.
-- If offline, GitHub is unavailable, or the downloaded catalog is invalid,
-  retain the last valid cached catalog without blocking creation or export.
-- Show catalog version, source (bundled/cache), and last successful update
-  date in the panel.
+- ตั้งชื่อ Artboard ที่สร้างเป็น `<preset-slug>_<width>x<height> px`
+- export Artboard ที่เลือกหรือทั้งหมดเป็น PNG, JPG หรือ WebP
+- ตั้งชื่อไฟล์เป็น `<artboard-name>.<extension>` หลังแทนที่อักขระที่ใช้ในชื่อไฟล์
+  ไม่ได้ และไม่เติมชื่อไฟล์ Illustrator ไว้ข้างหน้า
+- เตือนก่อน export เมื่อชื่อไฟล์หลังแปลงแล้วซ้ำกัน
+- เก็บ preset ที่ผู้ใช้สร้างและ catalog ที่ cache ไว้ในโฟลเดอร์ข้อมูลผู้ใช้ แยกจาก
+  โฟลเดอร์ติดตั้ง extension
+- มี catalog แบบ offline ติดมากับ extension
+- ตรวจ catalog จาก GitHub อัตโนมัติอย่างมากวันละหนึ่งครั้งเมื่อเปิด panel
+- มีปุ่ม **ตรวจสอบการอัปเดต preset** เพื่อให้ผู้ใช้ตรวจทันที
+- ดาวน์โหลด catalog ผ่าน HTTPS เท่านั้น และไม่ส่ง artwork, ชื่อเอกสาร, ข้อมูล
+  Artboard หรือ analytics ออกไป
+- หากออฟไลน์, GitHub ใช้งานไม่ได้ หรือ catalog ที่ดาวน์โหลดมาไม่ถูกต้อง ให้ใช้
+  catalog ล่าสุดที่ผ่านการตรวจสอบต่อไปโดยไม่ขัดจังหวะการสร้างหรือ export
+- แสดงเวอร์ชัน catalog, แหล่งข้อมูล (bundled/cache) และวันที่อัปเดตล่าสุดใน panel
 
-## GitHub catalog contract
+## ข้อตกลงของ GitHub catalog
 
-The catalog URL is configurable in one location in the extension source. The
-initial production URL is a GitHub raw-content HTTPS URL for
-`social-presets.json`. The JSON document contains:
+URL ของ catalog จะกำหนดในจุดเดียวของ source code โดย URL เริ่มต้นเป็น GitHub
+raw-content แบบ HTTPS ที่ชี้ไปยัง `social-presets.json` ซึ่งมีโครงสร้างดังนี้:
 
 ```json
 {
@@ -63,49 +58,41 @@ initial production URL is a GitHub raw-content HTTPS URL for
 }
 ```
 
-Validation rejects a catalog unless the schema version is `1`, the catalog
-version is a non-empty string, each preset ID is unique, and every width and
-height is a positive whole number.
+จะปฏิเสธ catalog หาก schema version ไม่ใช่ `1`, catalog version ว่าง, preset ID
+ซ้ำกัน หรือ width/height ไม่ใช่จำนวนเต็มบวก
 
-## Non-goals
+## สิ่งที่ไม่ทำในรุ่นแรก
 
-- No responsive relayout or automatic scaling of artwork.
-- No account sign-in, analytics, cloud storage, server-side code, or automatic
-  publishing.
-- No automatic network retry loop; checks happen only at panel open once per
-  day or when the user presses the update control.
-- No overwrite of existing exported files without a confirmation in a later
-  release.
+- ไม่จัด layout หรือย่อขยาย artwork แบบ responsive อัตโนมัติ
+- ไม่มีระบบลงชื่อเข้าใช้, analytics, cloud storage, server-side code หรือ publish
+  ไปยังแพลตฟอร์มโดยอัตโนมัติ
+- ไม่มีการ retry เครือข่ายเองเป็นวงวน: ตรวจเฉพาะตอนเปิด panel วันละครั้ง หรือเมื่อ
+  ผู้ใช้กดปุ่มตรวจสอบ
+- ไม่เขียนทับไฟล์ export ที่มีอยู่โดยไม่มีการยืนยันจากผู้ใช้
 
-## Architecture
+## โครงสร้างระบบ
 
-The CEP browser panel owns user interactions, catalog display, local
-preferences, and HTTPS retrieval. ExtendScript owns Illustrator DOM work:
-creating artboards, duplicating content only when explicitly selected in a
-future feature, and exporting files. The panel sends only validated,
-JSON-serialized commands to the host script and renders structured results.
+CEP browser panel รับผิดชอบการโต้ตอบ, การแสดง catalog, การเก็บค่าในเครื่อง และ
+การเรียก HTTPS ส่วน ExtendScript รับผิดชอบงาน Illustrator DOM ได้แก่ การสร้าง
+Artboard และ export ไฟล์ Panel ส่งเฉพาะคำสั่ง JSON ที่ผ่านการตรวจสอบแล้วไปยัง
+host script และแสดงผลลัพธ์แบบมีโครงสร้าง
 
-## Error handling
+## การจัดการข้อผิดพลาด
 
-- No open document: disable create/export actions and show the existing clear
-  error.
-- No valid presets: retain bundled or cached catalog and state why the remote
-  update was ignored.
-- Invalid export configuration: do not start export; identify the exact field.
-- Filename collision: show the colliding filenames and require a user decision
-  before export.
-- Host export failure: report the affected artboard and preserve all other
-  completed output.
+- ไม่มีเอกสารเปิดอยู่: ปิดการสร้าง/export และแสดงข้อความชัดเจน
+- ไม่มี preset ที่ผ่านการตรวจสอบ: ใช้ catalog bundled หรือ cache เดิม พร้อมแจ้งว่า
+  เหตุใด remote update จึงถูกละเว้น
+- ค่า export ไม่ถูกต้อง: ไม่เริ่ม export และระบุฟิลด์ที่ผิด
+- ชื่อไฟล์ซ้ำ: แสดงชื่อที่ชนกันและให้ผู้ใช้ตัดสินใจก่อน export
+- host export ล้มเหลว: รายงาน Artboard ที่ผิดพลาด และเก็บไฟล์อื่นที่ export สำเร็จไว้
 
-## Verification
+## การตรวจสอบ
 
-- Unit tests validate catalog parsing, duplicate rejection, positive integer
-  dimensions, filename sanitization, and collision detection.
-- Mocked host tests prove generated artboard rectangles/names and export
-  command arguments.
-- Panel tests cover manual update, daily update suppression, offline fallback,
-  and update status rendering.
-- Manual Illustrator test creates all five social boards, exports all formats,
-  confirms file names, then verifies an offline session still uses the cached
-  catalog.
+- Unit test ตรวจการอ่าน catalog, การปฏิเสธ ID ซ้ำ, ขนาดที่ต้องเป็นจำนวนเต็มบวก,
+  การทำความสะอาดชื่อไฟล์ และการตรวจชื่อชนกัน
+- Host test แบบ mock ตรวจ rect/ชื่อ Artboard ที่สร้างและอาร์กิวเมนต์ export
+- Panel test ครอบคลุมการตรวจอัปเดตด้วยปุ่ม, การจำกัดวันละครั้ง, การ fallback
+  เมื่อออฟไลน์ และการแสดงสถานะ update
+- ทดสอบด้วย Illustrator จริง: สร้าง Artboard ครบทั้งห้าขนาด, export ทุก format,
+  ยืนยันชื่อไฟล์ และตรวจว่าขณะออฟไลน์ยังใช้ catalog ที่ cache ได้
 
