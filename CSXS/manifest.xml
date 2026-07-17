@@ -8,6 +8,14 @@
   </ExecutionEnvironment>
   <DispatchInfoList><Extension Id="com.aibd.artboardsizerenamer.panel"><DispatchInfo>
     <Resources><MainPath>./client/index.html</MainPath><ScriptPath>./host/rename-artboards.jsx</ScriptPath></Resources>
-    <UI><Type>Panel</Type><Menu>Artboard Size Renamer</Menu><Geometry><Size><Width>300</Width><Height>180</Height></Size></Geometry></UI>
+    <UI>
+      <Type>Panel</Type>
+      <Menu>Artboard Size Renamer</Menu>
+      <Geometry>
+        <Size><Width>360</Width><Height>620</Height></Size>
+        <MinSize><Width>300</Width><Height>280</Height></MinSize>
+        <MaxSize><Width>720</Width><Height>1400</Height></MaxSize>
+      </Geometry>
+    </UI>
   </DispatchInfo></Extension></DispatchInfoList>
 </ExtensionManifest>
