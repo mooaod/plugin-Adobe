@@ -1,14 +1,55 @@
 function jsonQuote(value) {
-  return '"' + String(value == null ? '' : value)
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/\r/g, '\\r')
-    .replace(/\n/g, '\\n')
-    .replace(/\t/g, '\\t') + '"';
+  var input = String(value == null ? '' : value);
+  var quoted = '"';
+  var i;
+  var character;
+  var code;
+  var hex;
+
+  for (i = 0; i < input.length; i += 1) {
+    character = input.charAt(i);
+    code = input.charCodeAt(i);
+    if (character === '"') {
+      quoted += '\\"';
+    } else if (character === '\\') {
+      quoted += '\\\\';
+    } else if (character === '\b') {
+      quoted += '\\b';
+    } else if (character === '\f') {
+      quoted += '\\f';
+    } else if (character === '\n') {
+      quoted += '\\n';
+    } else if (character === '\r') {
+      quoted += '\\r';
+    } else if (character === '\t') {
+      quoted += '\\t';
+    } else if (code < 32 || code === 0x2028 || code === 0x2029) {
+      hex = code.toString(16);
+      quoted += '\\u' + ('0000' + hex).slice(-4);
+    } else {
+      quoted += character;
+    }
+  }
+
+  return quoted + '"';
 }
 
 function errorResult(message) {
   return '{"ok":false,"error":' + jsonQuote(message) + '}';
+}
+
+function stringArrayJson(values) {
+  var items = [];
+  var i;
+  for (i = 0; i < values.length; i += 1) {
+    items.push(jsonQuote(values[i]));
+  }
+  return '[' + items.join(',') + ']';
+}
+
+function createFailureResult(message, created) {
+  return '{"ok":false,"code":"CREATE_FAILED","error":' + jsonQuote(message) +
+    ',"created":[' + created.join(',') + ']}';
 }
 
 function activeDocument(application) {
@@ -42,6 +83,11 @@ function artboardJson(index, artboard) {
     ',"width":' + size.width + ',"height":' + size.height + '}';
 }
 
+function createdArtboardJson(index, name, width, height) {
+  return '{"index":' + index + ',"name":' + jsonQuote(name) +
+    ',"width":' + width + ',"height":' + height + '}';
+}
+
 function createPresetArtboards(application, presets) {
   var document = activeDocument(application);
   var i;
@@ -73,9 +119,38 @@ function createPresetArtboards(application, presets) {
 
   for (i = 0; i < presets.length; i += 1) {
     var preset = presets[i];
-    var artboard = artboards.add([left, preset.height, left + preset.width, 0]);
-    artboard.name = presetArtboardName(preset);
-    created.push(artboardJson(artboards.length - 1, artboard));
+    var artboard;
+    var createdIndex;
+    try {
+      artboard = artboards.add([left, preset.height, left + preset.width, 0]);
+    } catch (addError) {
+      return createFailureResult(
+        'Failed to create preset ' + preset.id + ': ' + addError,
+        created
+      );
+    }
+    createdIndex = artboards.length - 1;
+    try {
+      artboard.name = presetArtboardName(preset);
+    } catch (namingError) {
+      var currentName = '';
+      try {
+        currentName = artboard.name;
+      } catch (readNameError) {
+        currentName = '';
+      }
+      created.push(createdArtboardJson(createdIndex, currentName, preset.width, preset.height));
+      return createFailureResult(
+        'Failed to name preset ' + preset.id + ': ' + namingError,
+        created
+      );
+    }
+    created.push(createdArtboardJson(
+      createdIndex,
+      presetArtboardName(preset),
+      preset.width,
+      preset.height
+    ));
     left += preset.width + 120;
   }
 
@@ -139,9 +214,23 @@ function exportFormat(format) {
     return { extension: 'jpg', type: ExportType.JPEG, optionName: 'ExportOptionsJPEG', clipping: true };
   }
   if (normalized === 'webp') {
+    if (!webpExportSupported()) {
+      return { extension: 'webp', unavailable: true };
+    }
     return { extension: 'webp', type: ExportType.WEBP, optionName: 'ExportOptionsWebP', clipping: false };
   }
   return null;
+}
+
+function webpExportSupported() {
+  return typeof ExportType !== 'undefined' &&
+    typeof ExportType.WEBP !== 'undefined' &&
+    typeof ExportOptionsWebP !== 'undefined';
+}
+
+function getExportCapabilities() {
+  return '{"ok":true,"formats":{"png":true,"jpg":true,"webp":' +
+    (webpExportSupported() ? 'true' : 'false') + '}}';
 }
 
 function newExportOptions(format) {
@@ -164,6 +253,22 @@ function destinationFile(destination, basename) {
   return new File(destination + separator + basename);
 }
 
+function existingOutputConflicts(destination, artboards, format) {
+  var conflicts = [];
+  var i;
+  var filename;
+  var file;
+
+  for (i = 0; i < artboards.length; i += 1) {
+    filename = sanitizeFilename(artboards[i].name) + '.' + format.extension;
+    file = destinationFile(destination, filename);
+    if (file.exists) {
+      conflicts.push(filename);
+    }
+  }
+  return conflicts;
+}
+
 function exportArtboards(application, request) {
   var document = activeDocument(application);
   var format;
@@ -183,6 +288,10 @@ function exportArtboards(application, request) {
   if (!format) {
     return errorResult('Export format must be PNG, JPG, or WebP.');
   }
+  if (format.unavailable) {
+    return '{"ok":false,"code":"FORMAT_UNAVAILABLE","format":"webp",' +
+      '"error":"WebP export is unavailable in this Illustrator version."}';
+  }
 
   for (i = 0; i < request.artboardIndexes.length; i += 1) {
     var index = request.artboardIndexes[i];
@@ -195,6 +304,13 @@ function exportArtboards(application, request) {
   collisions = findFilenameCollisions(items, format.extension);
   if (collisions.length) {
     return errorResult('Export filename collision: ' + collisions[0]);
+  }
+
+  var existing = existingOutputConflicts(request.destination, items, format);
+  if (existing.length && request.overwriteExisting !== true) {
+    return '{"ok":false,"code":"OUTPUT_EXISTS",' +
+      '"error":"Existing output files require overwrite confirmation.",' +
+      '"conflicts":' + stringArrayJson(existing) + '}';
   }
 
   var exported = [];
@@ -224,6 +340,7 @@ if (typeof module !== 'undefined') {
   module.exports = {
     createPresetArtboards: createPresetArtboards,
     listArtboards: listArtboards,
+    getExportCapabilities: getExportCapabilities,
     exportArtboards: exportArtboards,
     sanitizeFilename: sanitizeFilename,
     findFilenameCollisions: findFilenameCollisions,

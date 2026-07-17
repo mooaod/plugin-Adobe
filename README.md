@@ -10,10 +10,19 @@ and exports selected artboards. / แผง CEP สำหรับ Adobe Illustr
    artboards are placed after the existing artboards and named from the preset.
    / เลือกพรีเซ็ตอย่างน้อยหนึ่งรายการ แล้วกด **Create Selected Presets**
    ระบบจะเพิ่มอาร์ตบอร์ดต่อจากอาร์ตบอร์ดเดิมและตั้งชื่อตามพรีเซ็ต
-2. Select the artboards to export, choose a destination folder and select
-   **PNG**, **JPG**, or **WebP**, then choose **Export Selected**. / เลือก
-   อาร์ตบอร์ดที่จะส่งออก ระบุโฟลเดอร์ปลายทาง เลือก **PNG**, **JPG** หรือ
-   **WebP** แล้วกด **Export Selected**
+2. Select the artboards to export, choose a destination folder and an available
+   format, then choose **Export Selected**. The panel checks every output first.
+   If files already exist, it lists all conflicts and exports nothing until you
+   explicitly confirm overwriting them. / เลือกอาร์ตบอร์ดที่จะส่งออก ระบุ
+   โฟลเดอร์ปลายทางและรูปแบบที่ใช้ได้ แล้วกด **Export Selected** แผงจะตรวจสอบ
+   ไฟล์ผลลัพธ์ทั้งหมดก่อน หากมีไฟล์อยู่แล้ว ระบบจะแสดงรายการที่ซ้ำทั้งหมดและ
+   จะยังไม่ส่งออกจนกว่าคุณจะยืนยันการเขียนทับอย่างชัดเจน
+
+PNG and JPG remain available in Illustrator 19. WebP requires a compatible
+Illustrator version and appears in the format menu only when the running host
+provides WebP export support. / PNG และ JPG ยังคงใช้งานได้ใน Illustrator 19
+ส่วน WebP ต้องใช้ Illustrator เวอร์ชันที่รองรับ และจะแสดงในเมนูรูปแบบเฉพาะ
+เมื่อโปรแกรมที่กำลังใช้งานรองรับการส่งออก WebP เท่านั้น
 
 Exports are blocked when two selected artboards would create the same sanitized
 filename (including names that differ only by letter case). Rename or deselect
@@ -21,6 +30,14 @@ one of the artboards before exporting. / ระบบจะบล็อกกา
 ที่เลือกสองรายการจะสร้างชื่อไฟล์ที่ผ่านการปรับแล้วซ้ำกัน (รวมถึงชื่อที่ต่าง
 กันเฉพาะตัวพิมพ์เล็ก-ใหญ่) ให้เปลี่ยนชื่อหรือยกเลิกการเลือกรายการหนึ่งก่อน
 ส่งออก
+
+Use **Add custom preset** to save a preset with a unique ID, label, width, and
+height. Custom presets are stored separately on your computer and merged with
+bundled or downloaded presets by ID, so catalog updates cannot delete them. /
+ใช้ **Add custom preset** เพื่อบันทึกพรีเซ็ตด้วย ID ที่ไม่ซ้ำ ป้ายชื่อ ความกว้าง
+และความสูง พรีเซ็ตที่กำหนดเองจะถูกเก็บแยกไว้ในคอมพิวเตอร์และรวมกับพรีเซ็ต
+ที่มากับโปรแกรมหรือที่ดาวน์โหลดตาม ID ดังนั้นการอัปเดตแคตตาล็อกจะไม่ลบ
+พรีเซ็ตเหล่านี้
 
 ## Preset updates and privacy / การอัปเดตพรีเซ็ตและความเป็นส่วนตัว
 

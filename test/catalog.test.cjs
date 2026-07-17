@@ -62,3 +62,29 @@ test('exposes the one canonical HTTPS catalog URL', () => {
     'https://raw.githubusercontent.com/mooaod/plugin-Adobe/main/social-presets.json'
   );
 });
+
+test('merges custom presets by unique ID with custom values taking precedence', () => {
+  const bundled = validCatalog({
+    presets: [
+      { id: 'same', label: 'Bundled Same', width: 100, height: 100 },
+      { id: 'bundled', label: 'Bundled', width: 200, height: 200 }
+    ]
+  });
+  const custom = [
+    { id: 'same', label: 'My Same', width: 300, height: 300 },
+    { id: 'custom', label: 'My Custom', width: 400, height: 500 }
+  ];
+
+  assert.deepEqual(catalog.mergeCatalogWithCustom(bundled, custom).presets, [
+    { id: 'same', label: 'My Same', width: 300, height: 300 },
+    { id: 'bundled', label: 'Bundled', width: 200, height: 200 },
+    { id: 'custom', label: 'My Custom', width: 400, height: 500 }
+  ]);
+});
+
+test('rejects invalid custom preset collections', () => {
+  assert.deepEqual(catalog.validateCustomPresets([
+    { id: 'one', label: 'One', width: 100, height: 100 },
+    { id: 'one', label: 'Duplicate', width: 200, height: 200 }
+  ]), { ok: false, error: 'Custom preset IDs must be unique.' });
+});

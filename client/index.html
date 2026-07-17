@@ -20,6 +20,25 @@
         </div>
         <div id="preset-list" class="checklist"></div>
         <button id="create-presets-button" type="button" disabled>Create Selected Presets</button>
+
+        <div class="custom-preset-form" aria-labelledby="custom-preset-heading">
+          <h3 id="custom-preset-heading">Add custom preset</h3>
+          <label for="custom-preset-id">Unique ID</label>
+          <input id="custom-preset-id" type="text" placeholder="my-banner">
+          <label for="custom-preset-label">Label</label>
+          <input id="custom-preset-label" type="text" placeholder="My Banner">
+          <div class="dimension-fields">
+            <div>
+              <label for="custom-preset-width">Width</label>
+              <input id="custom-preset-width" type="number" min="1" step="1" placeholder="1200">
+            </div>
+            <div>
+              <label for="custom-preset-height">Height</label>
+              <input id="custom-preset-height" type="number" min="1" step="1" placeholder="628">
+            </div>
+          </div>
+          <button id="add-custom-preset-button" class="secondary" type="button">Add Custom Preset</button>
+        </div>
       </section>
 
       <section aria-labelledby="export-heading">
@@ -28,7 +47,6 @@
         <select id="format-select">
           <option value="png">PNG</option>
           <option value="jpg">JPG</option>
-          <option value="webp">WebP</option>
         </select>
         <label for="destination-input">Destination folder</label>
         <input id="destination-input" type="text" placeholder="/path/to/export folder">

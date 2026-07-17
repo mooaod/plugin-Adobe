@@ -75,7 +75,9 @@ function fakeDocument() {
   const ids = [
     'rename-button', 'preset-list', 'create-presets-button', 'catalog-info',
     'update-presets-button', 'format-select', 'artboard-list',
-    'destination-input', 'export-button', 'collision-warning', 'status'
+    'destination-input', 'export-button', 'collision-warning', 'status',
+    'custom-preset-id', 'custom-preset-label', 'custom-preset-width',
+    'custom-preset-height', 'add-custom-preset-button'
   ];
   const elements = {};
   ids.forEach(function (id) {
@@ -100,11 +102,18 @@ function runPanel(options) {
       this.calls.push(script);
       if (script.indexOf('$.evalFile') >= 0) {
         callback(options.hostLoadResult || JSON.stringify({ ok: true }));
+      } else if (script === 'getExportCapabilities()') {
+        callback(JSON.stringify(options.capabilitiesResult || {
+          ok: true,
+          formats: { png: true, jpg: true, webp: true }
+        }));
       } else if (script === 'listArtboards(app)') {
         callback(JSON.stringify(options.artboardResult || {
           ok: true,
           artboards: [{ index: 0, name: 'Board', width: 100, height: 100 }]
         }));
+      } else if (script.indexOf('exportArtboards(app, ') === 0 && options.exportResults) {
+        callback(JSON.stringify(options.exportResults.shift()));
       } else {
         callback(JSON.stringify({ ok: true, created: [], exported: [] }));
       }
@@ -114,18 +123,26 @@ function runPanel(options) {
     }
   };
   const cacheState = options.cacheState;
+  const customState = options.customState;
   const writes = [];
   const cep = {
     fs: {
-      readFile: function () {
-        return cacheState
-          ? { err: 0, data: JSON.stringify(cacheState) }
+      readFile: function (filePath) {
+        const value = filePath.indexOf('social-presets-custom.json') >= 0
+          ? customState
+          : cacheState;
+        return value
+          ? { err: 0, data: JSON.stringify(value) }
           : { err: 2, data: '' };
       },
       makedir: function () { return { err: 0 }; },
       writeFile: function (filePath, data) {
         writes.push({ filePath: filePath, data: data });
-        return { err: 0 };
+        return {
+          err: options.customWriteError && filePath.indexOf('social-presets-custom.json') >= 0
+            ? 5
+            : 0
+        };
       }
     }
   };
@@ -166,7 +183,14 @@ function runPanel(options) {
     JSON: JSON,
     SystemPath: { USER_DATA: 'userData', EXTENSION: 'extension' },
     XMLHttpRequest: FakeXMLHttpRequest,
-    window: { cep: cep }
+    window: {
+      cep: cep,
+      confirm: function (message) {
+        context.confirmMessages.push(message);
+        return options.confirmOverwrite === true;
+      }
+    },
+    confirmMessages: []
   };
   vm.createContext(context);
   vm.runInContext(catalogSource, context);
@@ -177,7 +201,8 @@ function runPanel(options) {
     bridge: bridge,
     document: document,
     requests: requests,
-    writes: writes
+    writes: writes,
+    confirmMessages: context.confirmMessages
   };
 }
 
@@ -203,7 +228,8 @@ test('uses same-day cached presets, lists artboards, and blocks colliding export
 
   assert.match(panel.bridge.calls[0], /\$\.evalFile/);
   assert.match(panel.bridge.calls[0], /\/extension root\/host\/social-workflow\.jsx/);
-  assert.equal(panel.bridge.calls[1], 'listArtboards(app)');
+  assert.equal(panel.bridge.calls[1], 'getExportCapabilities()');
+  assert.equal(panel.bridge.calls[2], 'listArtboards(app)');
   assert.equal(remoteRequests.length, 0);
   assert.match(panel.document.elements.status.textContent, /Using cached presets/);
   assert.equal(panel.document.elements['export-button'].disabled, true);
@@ -220,7 +246,8 @@ test('loads the social host workflow before listing artboards', function () {
   });
 
   assert.match(panel.bridge.calls[0], /\$\.evalFile/);
-  assert.equal(panel.bridge.calls[1], 'listArtboards(app)');
+  assert.equal(panel.bridge.calls[1], 'getExportCapabilities()');
+  assert.equal(panel.bridge.calls[2], 'listArtboards(app)');
 });
 
 test('generated host loader returns JSON when ExtendScript has no JSON global', function () {
@@ -422,4 +449,184 @@ test('deselecting one colliding artboard re-enables export', function () {
 
   assert.equal(panel.document.elements['export-button'].disabled, false);
   assert.equal(panel.document.elements['collision-warning'].textContent, '');
+});
+
+test('exposes WebP only when the Illustrator host reports support', function () {
+  const unsupported = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache', lastSuccessfulCheck: new Date().toISOString()
+    },
+    capabilitiesResult: {
+      ok: true, formats: { png: true, jpg: true, webp: false }
+    }
+  });
+  const supported = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache', lastSuccessfulCheck: new Date().toISOString()
+    }
+  });
+
+  assert.equal(unsupported.document.elements['format-select'].children.length, 0);
+  assert.equal(supported.document.elements['format-select'].children.length, 1);
+  assert.equal(supported.document.elements['format-select'].children[0].value, 'webp');
+  assert.equal(supported.document.elements['format-select'].children[0].textContent, 'WebP');
+});
+
+test('asks once with every existing-file conflict and retries only after confirmation', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache', lastSuccessfulCheck: new Date().toISOString()
+    },
+    artboardResult: {
+      ok: true,
+      artboards: [
+        { index: 0, name: 'One', width: 100, height: 100 },
+        { index: 1, name: 'Two', width: 100, height: 100 }
+      ]
+    },
+    confirmOverwrite: true,
+    exportResults: [
+      {
+        ok: false,
+        code: 'OUTPUT_EXISTS',
+        error: 'Existing output files require overwrite confirmation.',
+        conflicts: ['One.png', 'Two.png']
+      },
+      { ok: true, exported: ['One.png', 'Two.png'] }
+    ]
+  });
+
+  panel.document.elements['export-button'].dispatch('click');
+
+  const exportCalls = panel.bridge.calls.filter(function (call) {
+    return call.indexOf('exportArtboards(app, ') === 0;
+  });
+  assert.equal(panel.confirmMessages.length, 1);
+  assert.match(panel.confirmMessages[0], /One\.png/);
+  assert.match(panel.confirmMessages[0], /Two\.png/);
+  assert.doesNotMatch(exportCalls[0], /overwriteExisting/);
+  assert.match(exportCalls[1], /"overwriteExisting":true/);
+  assert.match(panel.document.elements.status.textContent, /Exported 2/);
+});
+
+test('does not retry existing-file conflicts when overwrite confirmation is declined', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache', lastSuccessfulCheck: new Date().toISOString()
+    },
+    confirmOverwrite: false,
+    exportResults: [{
+      ok: false,
+      code: 'OUTPUT_EXISTS',
+      error: 'Existing output files require overwrite confirmation.',
+      conflicts: ['Board.png']
+    }]
+  });
+
+  panel.document.elements['export-button'].dispatch('click');
+
+  assert.equal(panel.confirmMessages.length, 1);
+  assert.equal(panel.bridge.calls.filter(function (call) {
+    return call.indexOf('exportArtboards(app, ') === 0;
+  }).length, 1);
+  assert.match(panel.document.elements.status.textContent, /cancelled/i);
+});
+
+test('persists custom presets separately and keeps them merged after a remote update', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog('1.0.0'), source: 'cache', lastSuccessfulCheck: new Date().toISOString()
+    },
+    customState: {
+      schemaVersion: 1,
+      presets: [{ id: 'saved', label: 'Saved Custom', width: 321, height: 654 }]
+    },
+    remote: {
+      type: 'load', status: 200, body: JSON.stringify(catalog('2.0.0'))
+    }
+  });
+
+  assert.equal(panel.document.elements['preset-list'].children.length, 2);
+  panel.document.elements['update-presets-button'].dispatch('click');
+  assert.equal(panel.document.elements['preset-list'].children.length, 2);
+  assert.match(
+    panel.document.elements['preset-list'].children[1].children[1].textContent,
+    /Saved Custom/
+  );
+  assert.equal(panel.writes.filter(function (write) {
+    return write.filePath.indexOf('social-presets-custom.json') >= 0;
+  }).length, 0);
+});
+
+test('automatic update bookkeeping never copies custom presets into the catalog cache', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog('1.0.0'), source: 'cache',
+      lastSuccessfulCheck: '2026-07-15T00:00:00.000Z'
+    },
+    customState: {
+      schemaVersion: 1,
+      presets: [{ id: 'saved', label: 'Saved Custom', width: 321, height: 654 }]
+    },
+    remote: { type: 'error' }
+  });
+  const cacheWrite = panel.writes.find(function (write) {
+    return write.filePath.indexOf('social-presets-cache.json') >= 0;
+  });
+
+  assert.ok(cacheWrite);
+  assert.deepEqual(JSON.parse(cacheWrite.data).catalog.presets, catalog('1.0.0').presets);
+});
+
+test('adds a valid custom preset through the panel and writes only the custom store', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache', lastSuccessfulCheck: new Date().toISOString()
+    }
+  });
+  panel.document.elements['custom-preset-id'].value = 'my-banner';
+  panel.document.elements['custom-preset-label'].value = 'My Banner';
+  panel.document.elements['custom-preset-width'].value = '1200';
+  panel.document.elements['custom-preset-height'].value = '628';
+
+  panel.document.elements['add-custom-preset-button'].dispatch('click');
+
+  assert.equal(panel.document.elements['preset-list'].children.length, 2);
+  const customWrites = panel.writes.filter(function (write) {
+    return write.filePath.indexOf('social-presets-custom.json') >= 0;
+  });
+  assert.equal(customWrites.length, 1);
+  assert.deepEqual(JSON.parse(customWrites[0].data), {
+    schemaVersion: 1,
+    presets: [{ id: 'my-banner', label: 'My Banner', width: 1200, height: 628 }]
+  });
+});
+
+test('does not show an unsaved custom preset when the separate store write fails', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache', lastSuccessfulCheck: new Date().toISOString()
+    },
+    customWriteError: true
+  });
+  panel.document.elements['custom-preset-id'].value = 'not-saved';
+  panel.document.elements['custom-preset-label'].value = 'Not Saved';
+  panel.document.elements['custom-preset-width'].value = '100';
+  panel.document.elements['custom-preset-height'].value = '200';
+
+  panel.document.elements['add-custom-preset-button'].dispatch('click');
+
+  assert.equal(panel.document.elements['preset-list'].children.length, 1);
+  assert.match(panel.document.elements.status.textContent, /Could not save/);
+});
+
+test('HTML contains custom preset inputs and does not expose WebP before capability detection', function () {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'client', 'index.html'), 'utf8');
+
+  assert.match(html, /id="custom-preset-id"/);
+  assert.match(html, /id="custom-preset-label"/);
+  assert.match(html, /id="custom-preset-width"/);
+  assert.match(html, /id="custom-preset-height"/);
+  assert.match(html, /id="add-custom-preset-button"/);
+  assert.doesNotMatch(html, /<option value="webp">/);
 });

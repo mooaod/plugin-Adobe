@@ -11,6 +11,7 @@ header,
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 h1 { margin: 0; font-size: 16px; }
 h2 { margin: 0 0 10px; font-size: 13px; }
+h3 { margin: 0 0 8px; font-size: 12px; }
 section { margin-top: 14px; padding-top: 14px; border-top: 1px solid #4a4a4a; }
 button,
 select,
@@ -28,5 +29,9 @@ input { width: 100%; padding: 7px 8px; border: 1px solid #606060; border-radius:
 .check-item input { width: auto; margin: 2px 0 0; }
 .meta { color: #aaa; font-size: 11px; text-align: right; }
 .warning { min-height: 1.4em; margin: 8px 0; color: #ffb95c; }
+.custom-preset-form { margin-top: 12px; padding-top: 12px; border-top: 1px solid #3e3e3e; }
+.dimension-fields { display: flex; gap: 8px; }
+.dimension-fields > div { flex: 1; }
+.custom-preset-form button { margin-top: 10px; }
 .utility { margin-top: 14px; }
 #status { min-height: 2.8em; margin: 14px 0 0; color: #d0d0d0; }

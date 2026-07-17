@@ -3,6 +3,7 @@
 
   var CACHE_DIRECTORY = 'com.aibd.artboardsizerenamer';
   var CACHE_FILENAME = 'social-presets-cache.json';
+  var CUSTOM_PRESETS_FILENAME = 'social-presets-custom.json';
   var BUNDLED_CATALOG_PATH = '../catalog/social-presets.json';
   var button = document.getElementById('rename-button');
   var presetList = document.getElementById('preset-list');
@@ -14,9 +15,15 @@
   var destinationInput = document.getElementById('destination-input');
   var exportButton = document.getElementById('export-button');
   var collisionWarning = document.getElementById('collision-warning');
+  var customPresetId = document.getElementById('custom-preset-id');
+  var customPresetLabel = document.getElementById('custom-preset-label');
+  var customPresetWidth = document.getElementById('custom-preset-width');
+  var customPresetHeight = document.getElementById('custom-preset-height');
+  var addCustomPresetButton = document.getElementById('add-custom-preset-button');
   var status = document.getElementById('status');
   var csInterface = new CSInterface();
   var activeCatalog = null;
+  var activeBaseCatalog = null;
   var catalogSource = 'bundled';
   var artboards = [];
   var presetCheckboxes = [];
@@ -24,6 +31,7 @@
   var hostReady = false;
   var hostLoadError = '';
   var cachedState = readCache();
+  var customPresets = readCustomPresets();
 
   function setStatus(message) {
     status.textContent = message;
@@ -35,9 +43,13 @@
     }
   }
 
-  function cachePath() {
+  function storagePath(filename) {
     var userData = csInterface.getSystemPath(SystemPath.USER_DATA).replace(/[\\\/]$/, '');
-    return userData + '/' + CACHE_DIRECTORY + '/' + CACHE_FILENAME;
+    return userData + '/' + CACHE_DIRECTORY + '/' + filename;
+  }
+
+  function cachePath() {
+    return storagePath(CACHE_FILENAME);
   }
 
   function readCache() {
@@ -55,6 +67,50 @@
       return parsed && typeof parsed === 'object' ? parsed : null;
     } catch (error) {
       return null;
+    }
+  }
+
+  function readCustomPresets() {
+    var result;
+    var parsed;
+    var validated;
+    try {
+      if (!window.cep || !window.cep.fs) {
+        return [];
+      }
+      result = window.cep.fs.readFile(storagePath(CUSTOM_PRESETS_FILENAME));
+      if (!result || result.err !== 0) {
+        return [];
+      }
+      parsed = JSON.parse(result.data);
+      if (!parsed || parsed.schemaVersion !== 1) {
+        return [];
+      }
+      validated = validateCustomPresets(parsed.presets);
+      return validated.ok ? validated.presets : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function persistCustomPresets() {
+    var userData;
+    var directory;
+    var writeResult;
+    try {
+      if (!window.cep || !window.cep.fs) {
+        return false;
+      }
+      userData = csInterface.getSystemPath(SystemPath.USER_DATA).replace(/[\\\/]$/, '');
+      directory = userData + '/' + CACHE_DIRECTORY;
+      window.cep.fs.makedir(directory);
+      writeResult = window.cep.fs.writeFile(
+        directory + '/' + CUSTOM_PRESETS_FILENAME,
+        JSON.stringify({ schemaVersion: 1, presets: customPresets })
+      );
+      return !!writeResult && writeResult.err === 0;
+    } catch (error) {
+      return false;
     }
   }
 
@@ -92,7 +148,7 @@
 
   function recordAutomaticAttempt(attemptedAt) {
     persistCache(
-      activeCatalog,
+      activeBaseCatalog,
       cachedState && cachedState.lastSuccessfulCheck,
       attemptedAt
     );
@@ -124,13 +180,14 @@
 
   function renderCatalog(catalog, source) {
     var i;
-    activeCatalog = catalog;
+    activeBaseCatalog = catalog;
+    activeCatalog = mergeCatalogWithCustom(catalog, customPresets);
     catalogSource = source;
     presetCheckboxes = [];
     clearElement(presetList);
 
-    for (i = 0; i < catalog.presets.length; i += 1) {
-      var preset = catalog.presets[i];
+    for (i = 0; i < activeCatalog.presets.length; i += 1) {
+      var preset = activeCatalog.presets[i];
       var label = document.createElement('label');
       var checkbox = document.createElement('input');
       var description = document.createElement('span');
@@ -239,6 +296,19 @@
     });
   }
 
+  function enableSupportedExportFormats(onReady) {
+    csInterface.evalScript('getExportCapabilities()', function (rawResult) {
+      var result = parseHostResult(rawResult);
+      if (result.ok && result.formats && result.formats.webp) {
+        var option = document.createElement('option');
+        option.value = 'webp';
+        option.textContent = 'WebP';
+        formatSelect.appendChild(option);
+      }
+      onReady();
+    });
+  }
+
   function loadHostWorkflow(onReady) {
     var extensionPath;
     var workflowPath;
@@ -265,7 +335,7 @@
         hostLoadError = '';
         updateCreateState();
         updateExportState();
-        onReady();
+        enableSupportedExportFormats(onReady);
       });
     } catch (error) {
       hostLoadError = error.message;
@@ -429,6 +499,79 @@
     });
   });
 
+  addCustomPresetButton.addEventListener('click', function () {
+    var candidate = {
+      id: customPresetId.value.trim(),
+      label: customPresetLabel.value.trim(),
+      width: Number(customPresetWidth.value),
+      height: Number(customPresetHeight.value)
+    };
+    var validation = validateCustomPresets([candidate]);
+    var i;
+
+    if (!validation.ok) {
+      setStatus(validation.error);
+      return;
+    }
+    if (activeCatalog) {
+      for (i = 0; i < activeCatalog.presets.length; i += 1) {
+        if (activeCatalog.presets[i].id === candidate.id) {
+          setStatus('Preset ID already exists. Choose a unique ID.');
+          return;
+        }
+      }
+    }
+    customPresets.push(candidate);
+    if (!persistCustomPresets()) {
+      customPresets.pop();
+      setStatus('Could not save the custom preset.');
+      return;
+    }
+    if (activeBaseCatalog) {
+      renderCatalog(activeBaseCatalog, catalogSource);
+    }
+    customPresetId.value = '';
+    customPresetLabel.value = '';
+    customPresetWidth.value = '';
+    customPresetHeight.value = '';
+    setStatus('Added custom preset ' + candidate.label + '.');
+  });
+
+  function completeExport(exportRequest, rawResult) {
+    var result = parseHostResult(rawResult);
+    var confirmationMessage;
+    if (result.ok) {
+      setStatus('Exported ' + result.exported.length + ' artboard(s).');
+      updateExportState();
+      return;
+    }
+    if (result.code === 'OUTPUT_EXISTS' && result.conflicts &&
+        result.conflicts.length && exportRequest.overwriteExisting !== true) {
+      confirmationMessage = 'These files already exist:\n\n' +
+        result.conflicts.join('\n') + '\n\nOverwrite all of them?';
+      if (window.confirm(confirmationMessage)) {
+        exportRequest.overwriteExisting = true;
+        setStatus('Exporting and overwriting confirmed files…');
+        sendExportRequest(exportRequest);
+        return;
+      }
+      setStatus('Export cancelled; no existing files were overwritten.');
+      updateExportState();
+      return;
+    }
+    setStatus(result.error);
+    updateExportState();
+  }
+
+  function sendExportRequest(exportRequest) {
+    csInterface.evalScript(
+      'exportArtboards(app, ' + JSON.stringify(exportRequest) + ')',
+      function (rawResult) {
+        completeExport(exportRequest, rawResult);
+      }
+    );
+  }
+
   exportButton.addEventListener('click', function () {
     var selected = selectedArtboards();
     var collisions = findFilenameCollisions(selected, formatSelect.value);
@@ -453,15 +596,7 @@
     };
     exportButton.disabled = true;
     setStatus('Exporting selected artboards…');
-    csInterface.evalScript('exportArtboards(app, ' + JSON.stringify(exportRequest) + ')', function (rawResult) {
-      var result = parseHostResult(rawResult);
-      if (result.ok) {
-        setStatus('Exported ' + result.exported.length + ' artboard(s).');
-      } else {
-        setStatus(result.error);
-      }
-      updateExportState();
-    });
+    sendExportRequest(exportRequest);
   });
 
   updateButton.addEventListener('click', function () {
