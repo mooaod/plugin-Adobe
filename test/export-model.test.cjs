@@ -18,6 +18,13 @@ test('findFilenameCollisions reports duplicate sanitized export names', function
   );
 });
 
+test('findFilenameCollisions reports export names that differ only by case', function () {
+  assert.deepEqual(
+    exportModel.findFilenameCollisions([{ name: 'A' }, { name: 'a' }], 'png'),
+    ['a.png']
+  );
+});
+
 test('findFilenameCollisions compares extensions case-insensitively', function () {
   assert.deepEqual(
     exportModel.findFilenameCollisions([{ name: 'One' }, { name: 'Two' }], 'JPG'),

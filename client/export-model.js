@@ -19,7 +19,7 @@ function findFilenameCollisions(artboards, format) {
 
   for (i = 0; i < artboards.length; i += 1) {
     var filename = sanitizeFilename(artboards[i].name) + '.' + extension;
-    var key = '$' + filename;
+    var key = '$' + filename.toLowerCase();
 
     if (counts[key]) {
       counts[key] += 1;

@@ -108,3 +108,17 @@ test('exportArtboards returns without exporting when sanitized filenames collide
     assert.equal(application.activeDocument.exportCalls.length, 0);
   });
 });
+
+test('exportArtboards returns without exporting when filenames differ only by case', function () {
+  withExportGlobals(function () {
+    const application = makeApplication([
+      { artboardRect: [0, 100, 100, 0], name: 'A' },
+      { artboardRect: [120, 100, 220, 0], name: 'a' }
+    ]);
+
+    assert.deepEqual(JSON.parse(host.exportArtboards(application, {
+      artboardIndexes: [0, 1], destination: '/tmp/social', format: 'png'
+    })), { ok: false, error: 'Export filename collision: a.png' });
+    assert.equal(application.activeDocument.exportCalls.length, 0);
+  });
+});
