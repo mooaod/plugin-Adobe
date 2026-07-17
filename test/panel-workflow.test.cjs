@@ -398,6 +398,20 @@ test('HTML loads catalog and export model before the panel controller', function
   assert.ok(controllerIndex > exportModelIndex);
 });
 
+test('leaves every preset unselected when the panel opens', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(),
+      source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    }
+  });
+  const presetCheckbox = panel.document.elements['preset-list'].children[0].children[0];
+
+  assert.equal(presetCheckbox.checked, false);
+  assert.equal(panel.document.elements['create-presets-button'].disabled, true);
+});
+
 test('creates checked presets and exports checked artboards with validated JSON requests', function () {
   const panel = runPanel({
     cacheState: {
@@ -411,6 +425,9 @@ test('creates checked presets and exports checked artboards with validated JSON 
     }
   });
 
+  const presetCheckbox = panel.document.elements['preset-list'].children[0].children[0];
+  presetCheckbox.checked = true;
+  presetCheckbox.dispatch('change');
   panel.document.elements['create-presets-button'].dispatch('click');
   const createCall = panel.bridge.calls.find(function (call) {
     return call.indexOf('createPresetArtboards(app, ') === 0;

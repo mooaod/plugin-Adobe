@@ -193,8 +193,9 @@
       var description = document.createElement('span');
       label.className = 'check-item';
       checkbox.type = 'checkbox';
-      checkbox.checked = true;
+      checkbox.checked = false;
       checkbox.dataset.presetIndex = String(i);
+      checkbox.addEventListener('change', updateCreateState);
       description.textContent = preset.label + ' — ' + preset.width + ' × ' + preset.height + ' px';
       label.appendChild(checkbox);
       label.appendChild(description);
