@@ -1,0 +1,7 @@
+{
+  "name": "artboard-size-renamer",
+  "private": true,
+  "scripts": {
+    "test": "node --test"
+  }
+}
