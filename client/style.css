@@ -6,8 +6,27 @@
 }
 
 body { margin: 0; }
-main { padding: 16px; }
-h1 { margin: 0 0 16px; font-size: 16px; }
+main { padding: 14px; }
+header,
+.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+h1 { margin: 0; font-size: 16px; }
+h2 { margin: 0 0 10px; font-size: 13px; }
+section { margin-top: 14px; padding-top: 14px; border-top: 1px solid #4a4a4a; }
+button,
+select,
+input { box-sizing: border-box; font: inherit; }
 button { padding: 8px 12px; border: 0; border-radius: 3px; color: #fff; background: #1473e6; cursor: pointer; }
 button:hover { background: #0d66d0; }
-#status { min-height: 1.4em; margin: 12px 0 0; color: #d0d0d0; }
+button.secondary { background: #4a4a4a; }
+button.secondary:hover { background: #5a5a5a; }
+button:disabled { opacity: .48; cursor: default; }
+label { display: block; margin: 8px 0 4px; color: #d8d8d8; }
+select,
+input { width: 100%; padding: 7px 8px; border: 1px solid #606060; border-radius: 3px; color: #f4f4f4; background: #333; }
+.checklist { max-height: 150px; margin: 8px 0 10px; overflow-y: auto; }
+.check-item { display: flex; align-items: flex-start; gap: 7px; margin: 0; padding: 5px 2px; }
+.check-item input { width: auto; margin: 2px 0 0; }
+.meta { color: #aaa; font-size: 11px; text-align: right; }
+.warning { min-height: 1.4em; margin: 8px 0; color: #ffb95c; }
+.utility { margin-top: 14px; }
+#status { min-height: 2.8em; margin: 14px 0 0; color: #d0d0d0; }
