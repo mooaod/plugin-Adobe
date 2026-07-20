@@ -114,6 +114,8 @@ function runPanel(options) {
         }));
       } else if (script.indexOf('exportArtboards(app, ') === 0 && options.exportResults) {
         callback(JSON.stringify(options.exportResults.shift()));
+      } else if (script.indexOf('createPresetArtboards(app, ') === 0 && options.createRawResult) {
+        callback(options.createRawResult);
       } else {
         callback(JSON.stringify({ ok: true, created: [], exported: [] }));
       }
@@ -452,6 +454,22 @@ test('creates checked presets and exports checked artboards with validated JSON 
   assert.match(exportCall, /"artboardIndexes":\[4\]/);
   assert.match(exportCall, /"destination":"\/exports"/);
   assert.match(exportCall, /"format":"png"/);
+});
+
+test('reports the raw Illustrator response when preset creation cannot be parsed', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache', lastSuccessfulCheck: new Date().toISOString()
+    },
+    createRawResult: 'EvalScript error.'
+  });
+  const presetCheckbox = panel.document.elements['preset-list'].children[0].children[0];
+
+  presetCheckbox.checked = true;
+  presetCheckbox.dispatch('change');
+  panel.document.elements['create-presets-button'].dispatch('click');
+
+  assert.match(panel.document.elements.status.textContent, /EvalScript error\./);
 });
 
 test('deselecting one colliding artboard re-enables export', function () {

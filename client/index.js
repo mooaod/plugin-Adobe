@@ -280,7 +280,10 @@
     try {
       return JSON.parse(rawResult);
     } catch (error) {
-      return { ok: false, error: 'Could not read Illustrator’s response. Please try again.' };
+      return {
+        ok: false,
+        error: 'Illustrator returned an error: ' + String(rawResult || 'No response.')
+      };
     }
   }
 
