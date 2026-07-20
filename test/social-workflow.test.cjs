@@ -1,8 +1,22 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const test = require('node:test');
+const vm = require('node:vm');
 
 require.extensions['.jsx'] = require.extensions['.js'];
 const host = require('../host/social-workflow.jsx');
+
+test('exposes social workflow functions in the ExtendScript global scope', function () {
+  const context = { $: { global: {} } };
+  const source = fs.readFileSync('host/social-workflow.jsx', 'utf8');
+
+  vm.runInNewContext(source, context);
+
+  assert.equal(typeof context.$.global.createPresetArtboards, 'function');
+  assert.equal(typeof context.$.global.listArtboards, 'function');
+  assert.equal(typeof context.$.global.getExportCapabilities, 'function');
+  assert.equal(typeof context.$.global.exportArtboards, 'function');
+});
 
 function makeApplication(artboards, options) {
   options = options || {};

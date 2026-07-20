@@ -342,6 +342,13 @@ function exportArtboards(application, request) {
   }()) + ']}';
 }
 
+if (typeof $ !== 'undefined' && $.global) {
+  $.global.createPresetArtboards = createPresetArtboards;
+  $.global.listArtboards = listArtboards;
+  $.global.getExportCapabilities = getExportCapabilities;
+  $.global.exportArtboards = exportArtboards;
+}
+
 if (typeof module !== 'undefined') {
   module.exports = {
     createPresetArtboards: createPresetArtboards,
