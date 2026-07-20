@@ -123,6 +123,7 @@ test('createPresetArtboards returns partial created items when adding an artboar
   assert.equal(result.ok, false);
   assert.equal(result.code, 'CREATE_FAILED');
   assert.match(result.error, /second/);
+  assert.match(result.error, /rectangle \[220,200,420,0\]/);
   assert.deepEqual(result.created, [
     { index: 0, name: 'first_100x100 px', width: 100, height: 100 }
   ]);

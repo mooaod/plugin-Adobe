@@ -121,11 +121,13 @@ function createPresetArtboards(application, presets) {
     var preset = presets[i];
     var artboard;
     var createdIndex;
+    var rectangle = [left, preset.height, left + preset.width, 0];
     try {
-      artboard = artboards.add([left, preset.height, left + preset.width, 0]);
+      artboard = artboards.add(rectangle);
     } catch (addError) {
       return createFailureResult(
-        'Failed to create preset ' + preset.id + ': ' + addError,
+        'Failed to create preset ' + preset.id + ': ' + addError +
+          ' at rectangle [' + rectangle.join(',') + ']',
         created
       );
     }
