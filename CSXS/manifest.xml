@@ -11,6 +11,12 @@
     <UI>
       <Type>Panel</Type>
       <Menu>Artboard Size Renamer</Menu>
+      <Icons>
+        <Icon Type="Normal">./assets/artboard-size-renamer-icon-dark.png</Icon>
+        <Icon Type="RollOver">./assets/artboard-size-renamer-icon-dark.png</Icon>
+        <Icon Type="DarkNormal">./assets/artboard-size-renamer-icon-dark.png</Icon>
+        <Icon Type="DarkRollOver">./assets/artboard-size-renamer-icon-dark.png</Icon>
+      </Icons>
       <Geometry>
         <Size><Width>360</Width><Height>620</Height></Size>
         <MinSize><Width>300</Width><Height>280</Height></MinSize>

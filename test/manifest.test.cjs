@@ -100,6 +100,15 @@ test('registers an Illustrator CEP panel', () => {
   assert.match(manifest, /<Type>Panel<\/Type>/);
 });
 
+test('declares dark normal and high-DPI panel icons', () => {
+  const manifest = fs.readFileSync('CSXS/manifest.xml', 'utf8');
+
+  assert.match(manifest, /<Icon Type="DarkNormal">\.\/assets\/artboard-size-renamer-icon-dark\.png<\/Icon>/);
+  assert.match(manifest, /<Icon Type="DarkRollOver">\.\/assets\/artboard-size-renamer-icon-dark\.png<\/Icon>/);
+  assert.match(manifest, /<Icon Type="Normal">\.\/assets\/artboard-size-renamer-icon-dark\.png<\/Icon>/);
+  assert.match(manifest, /<Icon Type="RollOver">\.\/assets\/artboard-size-renamer-icon-dark\.png<\/Icon>/);
+});
+
 test('allows the social panel to start tall and resize vertically', () => {
   const manifest = fs.readFileSync('CSXS/manifest.xml', 'utf8');
 
