@@ -21,6 +21,7 @@ test('exposes social workflow functions in the ExtendScript global scope', funct
 function makeApplication(artboards, options) {
   options = options || {};
   const added = [];
+  let invalidatedAfterReject = false;
   const document = {
     artboards: artboards,
     exportCalls: [],
@@ -30,7 +31,13 @@ function makeApplication(artboards, options) {
     }
   };
   document.artboards.add = function (rect) {
+    if (invalidatedAfterReject) {
+      throw new Error('there is no document');
+    }
     if (options.rejectRectangle && options.rejectRectangle(rect)) {
+      if (options.invalidateAfterReject) {
+        invalidatedAfterReject = true;
+      }
       throw new Error('outside canvas');
     }
     if (options.addFailureAt === added.length) {
@@ -119,6 +126,24 @@ test('createPresetArtboards falls back to the left when the right edge is outsid
   assert.deepEqual(application.added[0].artboardRect, [6320, 1350, 7400, 0]);
 });
 
+test('createPresetArtboards chooses a safe rectangle before Illustrator invalidates the document reference', function () {
+  const application = makeApplication([
+    { artboardRect: [5548.95963996574, -3556.53958083981, 6628.95963996574, -5476.53958083981], name: 'First' },
+    { artboardRect: [4348.95963996574, -3556.53958083981, 14359.0811893482, -5476.53958083981], name: 'Rightmost' }
+  ], {
+    rejectRectangle: function (rect) { return rect[2] > 15000; },
+    invalidateAfterReject: true
+  });
+
+  const result = JSON.parse(host.createPresetArtboards(application, [
+    { id: 'instagram-feed', width: 1080, height: 1080 }
+  ]));
+
+  assert.equal(result.ok, true);
+  assert.ok(Math.abs(application.added[0].artboardRect[0] - 3148.95963996574) < 0.000001);
+  assert.deepEqual(application.added[0].artboardRect.slice(1), [-4396.53958083981, 4228.95963996574, -5476.53958083981]);
+});
+
 test('createPresetArtboards falls back below when both horizontal sides are outside the canvas', function () {
   const application = makeApplication([
     { artboardRect: [-8100, 1000, -7000, 0], name: 'Near Left Edge' },
@@ -175,7 +200,7 @@ test('createPresetArtboards returns partial created items when adding an artboar
   assert.equal(result.ok, false);
   assert.equal(result.code, 'CREATE_FAILED');
   assert.match(result.error, /second/);
-  assert.match(result.error, /rectangles \[220,200,420,0\]/);
+  assert.match(result.error, /\[220,200,420,0\]/);
   assert.deepEqual(result.created, [
     { index: 0, name: 'first_100x100 px', width: 100, height: 100 }
   ]);

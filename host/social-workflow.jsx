@@ -136,6 +136,45 @@ function artboardPlacementCandidates(artboards, preset) {
   ];
 }
 
+function rectangleSafetyScore(rectangle) {
+  var score = 0;
+  var i;
+  for (i = 0; i < rectangle.length; i += 1) {
+    if (Math.abs(rectangle[i]) > score) {
+      score = Math.abs(rectangle[i]);
+    }
+  }
+  return score;
+}
+
+function preferredRectanglesFirst(rectangles) {
+  var canvasCoordinateLimit = 8192;
+  var safe = [];
+  var unsafe = [];
+  var i;
+  var j;
+  var temporary;
+
+  for (i = 0; i < rectangles.length; i += 1) {
+    if (rectangleSafetyScore(rectangles[i]) <= canvasCoordinateLimit) {
+      safe.push(rectangles[i]);
+    } else {
+      unsafe.push(rectangles[i]);
+    }
+  }
+
+  for (i = 0; i < unsafe.length - 1; i += 1) {
+    for (j = i + 1; j < unsafe.length; j += 1) {
+      if (rectangleSafetyScore(unsafe[j]) < rectangleSafetyScore(unsafe[i])) {
+        temporary = unsafe[i];
+        unsafe[i] = unsafe[j];
+        unsafe[j] = temporary;
+      }
+    }
+  }
+  return safe.concat(unsafe);
+}
+
 function createPresetArtboards(application, presets) {
   var document = activeDocument(application);
   var i;
@@ -160,13 +199,18 @@ function createPresetArtboards(application, presets) {
     var preset = presets[i];
     var artboard = null;
     var createdIndex;
-    var rectangles = artboardPlacementCandidates(artboards, preset);
+    var rectangles = preferredRectanglesFirst(artboardPlacementCandidates(artboards, preset));
     var attemptedRectangles = [];
     var addError = null;
     var candidateIndex;
     for (candidateIndex = 0; candidateIndex < rectangles.length; candidateIndex += 1) {
       attemptedRectangles.push('[' + rectangles[candidateIndex].join(',') + ']');
       try {
+        document = activeDocument(application);
+        if (!document) {
+          throw new Error('there is no document');
+        }
+        artboards = document.artboards;
         artboard = artboards.add(rectangles[candidateIndex]);
         addError = null;
         break;
