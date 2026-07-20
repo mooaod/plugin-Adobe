@@ -103,6 +103,10 @@ test('registers an Illustrator CEP panel', () => {
 test('declares dark normal and high-DPI panel icons', () => {
   const manifest = fs.readFileSync('CSXS/manifest.xml', 'utf8');
 
+  assert.ok(
+    manifest.indexOf('<Geometry>') < manifest.indexOf('<Icons>'),
+    'CEP UI elements must declare Geometry before Icons'
+  );
   assert.match(manifest, /<Icon Type="DarkNormal">\.\/assets\/artboard-size-renamer-icon-dark\.png<\/Icon>/);
   assert.match(manifest, /<Icon Type="DarkRollOver">\.\/assets\/artboard-size-renamer-icon-dark\.png<\/Icon>/);
   assert.match(manifest, /<Icon Type="Normal">\.\/assets\/artboard-size-renamer-icon-dark\.png<\/Icon>/);

@@ -130,9 +130,10 @@ Expected: FAIL because `CSXS/manifest.xml` does not yet contain the `<Icons>` bl
 
 - [ ] **Step 3: Add the CEP icon declarations**
 
-Inside `CSXS/manifest.xml`, place this block in `<UI>` after `<Menu>` and before `<Geometry>`:
+Inside `CSXS/manifest.xml`, place this block in `<UI>` after the closing `</Geometry>` tag. The CEP 7 UI sequence requires `Type`, `Menu`, `Geometry`, then `Icons`:
 
 ```xml
+</Geometry>
 <Icons>
   <Icon Type="Normal">./assets/artboard-size-renamer-icon-dark.png</Icon>
   <Icon Type="RollOver">./assets/artboard-size-renamer-icon-dark.png</Icon>
