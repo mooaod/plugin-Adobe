@@ -84,6 +84,7 @@ test('createPresetArtboards starts after the rightmost board and names the new p
 
   assert.equal(result.created[0].name, 'instagram-feed_1080x1080 px');
   assert.deepEqual(application.added[0].artboardRect, [1020, 1080, 2100, 0]);
+  assert.equal(application.activeDocument.activeIndex, 2);
 });
 
 test('listArtboards returns each board with its index and dimensions', function () {

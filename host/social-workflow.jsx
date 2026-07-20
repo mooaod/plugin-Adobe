@@ -154,6 +154,12 @@ function createPresetArtboards(application, presets) {
     left += preset.width + 120;
   }
 
+  try {
+    artboards.setActiveArtboardIndex(artboards.length - 1);
+  } catch (activeArtboardError) {
+    // The artboards were created successfully even if the host cannot focus one.
+  }
+
   return '{"ok":true,"created":[' + created.join(',') + ']}';
 }
 

@@ -398,6 +398,17 @@ test('HTML loads catalog and export model before the panel controller', function
   assert.ok(controllerIndex > exportModelIndex);
 });
 
+test('shows the operation status directly below the preset creation button', function () {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'client', 'index.html'), 'utf8');
+  const createButtonIndex = html.indexOf('id="create-presets-button"');
+  const statusIndex = html.indexOf('id="status"');
+  const customFormIndex = html.indexOf('class="custom-preset-form"');
+
+  assert.ok(createButtonIndex >= 0);
+  assert.ok(statusIndex > createButtonIndex);
+  assert.ok(statusIndex < customFormIndex);
+});
+
 test('leaves every preset unselected when the panel opens', function () {
   const panel = runPanel({
     cacheState: {
