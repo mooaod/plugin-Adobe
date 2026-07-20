@@ -30,6 +30,9 @@ function makeApplication(artboards, options) {
     }
   };
   document.artboards.add = function (rect) {
+    if (options.rejectRectangle && options.rejectRectangle(rect)) {
+      throw new Error('outside canvas');
+    }
     if (options.addFailureAt === added.length) {
       throw new Error('add failed');
     }
@@ -101,6 +104,55 @@ test('createPresetArtboards starts after the rightmost board and names the new p
   assert.equal(application.activeDocument.activeIndex, 2);
 });
 
+test('createPresetArtboards falls back to the left when the right edge is outside the canvas', function () {
+  const application = makeApplication([
+    { artboardRect: [7520, 1500, 8600, 0], name: 'Near Right Edge' }
+  ], {
+    rejectRectangle: function (rect) { return rect[2] > 8192; }
+  });
+
+  const result = JSON.parse(host.createPresetArtboards(application, [
+    { id: 'instagram-portrait', width: 1080, height: 1350 }
+  ]));
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(application.added[0].artboardRect, [6320, 1350, 7400, 0]);
+});
+
+test('createPresetArtboards falls back below when both horizontal sides are outside the canvas', function () {
+  const application = makeApplication([
+    { artboardRect: [-8100, 1000, -7000, 0], name: 'Near Left Edge' },
+    { artboardRect: [7000, 1000, 8100, 0], name: 'Near Right Edge' }
+  ], {
+    rejectRectangle: function (rect) { return rect[0] < -8192 || rect[2] > 8192; }
+  });
+
+  const result = JSON.parse(host.createPresetArtboards(application, [
+    { id: 'instagram-portrait', width: 1080, height: 1350 }
+  ]));
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(application.added[0].artboardRect, [-8100, -120, -7020, -1470]);
+});
+
+test('createPresetArtboards falls back above when right, left, and below are outside the canvas', function () {
+  const application = makeApplication([
+    { artboardRect: [-8100, 1000, -7000, 0], name: 'Near Left Edge' },
+    { artboardRect: [7000, 1000, 8100, 0], name: 'Near Right Edge' }
+  ], {
+    rejectRectangle: function (rect) {
+      return rect[0] < -8192 || rect[2] > 8192 || rect[3] < -1000;
+    }
+  });
+
+  const result = JSON.parse(host.createPresetArtboards(application, [
+    { id: 'instagram-portrait', width: 1080, height: 1350 }
+  ]));
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(application.added[0].artboardRect, [-8100, 2470, -7020, 1120]);
+});
+
 test('listArtboards returns each board with its index and dimensions', function () {
   const application = makeApplication([
     { artboardRect: [0, 1080, 1080, 0], name: 'instagram-feed_1080x1080 px' }
@@ -123,7 +175,7 @@ test('createPresetArtboards returns partial created items when adding an artboar
   assert.equal(result.ok, false);
   assert.equal(result.code, 'CREATE_FAILED');
   assert.match(result.error, /second/);
-  assert.match(result.error, /rectangle \[220,200,420,0\]/);
+  assert.match(result.error, /rectangles \[220,200,420,0\]/);
   assert.deepEqual(result.created, [
     { index: 0, name: 'first_100x100 px', width: 100, height: 100 }
   ]);

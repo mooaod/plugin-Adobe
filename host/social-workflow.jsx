@@ -88,13 +88,59 @@ function createdArtboardJson(index, name, width, height) {
     ',"width":' + width + ',"height":' + height + '}';
 }
 
+function artboardPlacementCandidates(artboards, preset) {
+  var gap = 120;
+  var firstRect;
+  var minLeft;
+  var maxRight;
+  var maxTop;
+  var minBottom;
+  var anchorLeft;
+  var anchorBottom;
+  var i;
+  var rect;
+
+  if (artboards.length === 0) {
+    return [[0, preset.height, preset.width, 0]];
+  }
+
+  firstRect = artboards[0].artboardRect;
+  minLeft = firstRect[0];
+  maxTop = firstRect[1];
+  maxRight = firstRect[2];
+  minBottom = firstRect[3];
+  anchorLeft = firstRect[0];
+  anchorBottom = firstRect[3];
+
+  for (i = 1; i < artboards.length; i += 1) {
+    rect = artboards[i].artboardRect;
+    if (rect[0] < minLeft) {
+      minLeft = rect[0];
+    }
+    if (rect[1] > maxTop) {
+      maxTop = rect[1];
+    }
+    if (rect[2] > maxRight) {
+      maxRight = rect[2];
+    }
+    if (rect[3] < minBottom) {
+      minBottom = rect[3];
+    }
+  }
+
+  return [
+    [maxRight + gap, anchorBottom + preset.height, maxRight + gap + preset.width, anchorBottom],
+    [minLeft - gap - preset.width, anchorBottom + preset.height, minLeft - gap, anchorBottom],
+    [anchorLeft, minBottom - gap, anchorLeft + preset.width, minBottom - gap - preset.height],
+    [anchorLeft, maxTop + gap + preset.height, anchorLeft + preset.width, maxTop + gap]
+  ];
+}
+
 function createPresetArtboards(application, presets) {
   var document = activeDocument(application);
   var i;
-  var maximumRight;
   var artboards;
   var created = [];
-  var left;
 
   if (!document) {
     return errorResult('Open an Illustrator document first.');
@@ -109,25 +155,29 @@ function createPresetArtboards(application, presets) {
   }
 
   artboards = document.artboards;
-  for (i = 0; i < artboards.length; i += 1) {
-    var right = artboards[i].artboardRect[2];
-    if (maximumRight === undefined || right > maximumRight) {
-      maximumRight = right;
-    }
-  }
-  left = maximumRight === undefined ? 0 : maximumRight + 120;
 
   for (i = 0; i < presets.length; i += 1) {
     var preset = presets[i];
-    var artboard;
+    var artboard = null;
     var createdIndex;
-    var rectangle = [left, preset.height, left + preset.width, 0];
-    try {
-      artboard = artboards.add(rectangle);
-    } catch (addError) {
+    var rectangles = artboardPlacementCandidates(artboards, preset);
+    var attemptedRectangles = [];
+    var addError = null;
+    var candidateIndex;
+    for (candidateIndex = 0; candidateIndex < rectangles.length; candidateIndex += 1) {
+      attemptedRectangles.push('[' + rectangles[candidateIndex].join(',') + ']');
+      try {
+        artboard = artboards.add(rectangles[candidateIndex]);
+        addError = null;
+        break;
+      } catch (candidateError) {
+        addError = candidateError;
+      }
+    }
+    if (!artboard) {
       return createFailureResult(
         'Failed to create preset ' + preset.id + ': ' + addError +
-          ' at rectangle [' + rectangle.join(',') + ']',
+          ' at rectangles ' + attemptedRectangles.join('; '),
         created
       );
     }
@@ -153,7 +203,6 @@ function createPresetArtboards(application, presets) {
       preset.width,
       preset.height
     ));
-    left += preset.width + 120;
   }
 
   try {
