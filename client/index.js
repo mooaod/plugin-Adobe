@@ -43,6 +43,24 @@
   var cachedState = readCache();
   var customPresets = readCustomPresets();
 
+  function initializeAccordions() {
+    var triggers = document.querySelectorAll
+      ? document.querySelectorAll('.accordion-trigger')
+      : [];
+    var i;
+    for (i = 0; i < triggers.length; i += 1) {
+      triggers[i].addEventListener('click', function () {
+        var body = document.getElementById(this.dataset.accordionTarget);
+        var expanded = this.getAttribute('aria-expanded') === 'true';
+        if (!body) {
+          return;
+        }
+        this.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        body.hidden = expanded;
+      });
+    }
+  }
+
   function setStatus(message) {
     status.textContent = message;
   }
@@ -278,10 +296,39 @@
 
   function clearPreflightReport() {
     preflightReport = null;
-    preflightSummary.textContent = '';
+    clearElement(preflightSummary);
     preflightSummary.className = 'preflight-summary';
     clearElement(preflightResults);
     updatePreflightState();
+  }
+
+  function preflightStatusMeta(statusName) {
+    return {
+      pass: { icon: '✓', label: 'Pass' },
+      rename: { icon: '!', label: 'Rename' },
+      missing: { icon: '×', label: 'Missing' },
+      duplicate: { icon: '−', label: 'Duplicate' }
+    }[statusName];
+  }
+
+  function appendPreflightSummaryRow(statusName, count) {
+    var meta = preflightStatusMeta(statusName);
+    var row = document.createElement('div');
+    var icon = document.createElement('span');
+    var countLabel = document.createElement('span');
+    var badge = document.createElement('span');
+    row.className = 'preflight-summary-row ' + statusName;
+    row.dataset.status = statusName;
+    icon.className = 'preflight-status-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = meta.icon;
+    countLabel.textContent = count + ' ' + meta.label;
+    badge.className = 'preflight-status-badge';
+    badge.textContent = meta.label;
+    row.appendChild(icon);
+    row.appendChild(countLabel);
+    row.appendChild(badge);
+    preflightSummary.appendChild(row);
   }
 
   function renderPreflightReport(report) {
@@ -290,11 +337,12 @@
     var result;
     var item;
     var matchingNames;
-    preflightSummary.textContent = report.summary.pass + ' Pass · ' +
-      report.summary.rename + ' Rename · ' +
-      report.summary.missing + ' Missing · ' +
-      report.summary.duplicate + ' Duplicate';
+    clearElement(preflightSummary);
     preflightSummary.className = 'preflight-summary';
+    appendPreflightSummaryRow('pass', report.summary.pass);
+    appendPreflightSummaryRow('rename', report.summary.rename);
+    appendPreflightSummaryRow('missing', report.summary.missing);
+    appendPreflightSummaryRow('duplicate', report.summary.duplicate);
     clearElement(preflightResults);
     for (i = 0; i < report.results.length; i += 1) {
       result = report.results[i];
@@ -1093,6 +1141,7 @@
     updatePreflightState();
   });
 
+  initializeAccordions();
   loadBundledCatalog();
   loadHostWorkflow(refreshArtboards);
 }());
