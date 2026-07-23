@@ -15,6 +15,12 @@ test('panel markup provides accessible independent accordion cards', () => {
   assert.match(html, /id="export-body"[\s\S]*hidden/);
 });
 
+test('presets card separates the rename utility with a semantic divider', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'client', 'index.html'), 'utf8');
+
+  assert.match(html, /<\/div>\s*<hr class="utility-divider">\s*<div class="utility"><button id="rename-button"/);
+});
+
 test('panel controller invokes the host rename operation and reports its result', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'client', 'index.js'), 'utf8');
 
