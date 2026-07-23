@@ -14,6 +14,7 @@ test('exposes social workflow functions in the ExtendScript global scope', funct
 
   assert.equal(typeof context.$.global.createPresetArtboards, 'function');
   assert.equal(typeof context.$.global.listArtboards, 'function');
+  assert.equal(typeof context.$.global.renameArtboards, 'function');
   assert.equal(typeof context.$.global.getExportCapabilities, 'function');
   assert.equal(typeof context.$.global.exportArtboards, 'function');
 });
@@ -187,6 +188,29 @@ test('listArtboards returns each board with its index and dimensions', function 
     ok: true,
     artboards: [{ index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 }]
   });
+});
+
+test('renameArtboards renames validated artboard indexes in ascending order', function () {
+  const application = makeApplication([
+    { artboardRect: [0, 100, 100, 0], name: 'First' },
+    { artboardRect: [120, 100, 220, 0], name: 'Second' }
+  ]);
+
+  assert.deepEqual(JSON.parse(host.renameArtboards(application, [
+    { index: 1, name: 'second_100x100 px' },
+    { index: 0, name: 'first_100x100 px' }
+  ])), { ok: true, renamed: [
+    { index: 0, name: 'first_100x100 px' },
+    { index: 1, name: 'second_100x100 px' }
+  ] });
+});
+
+test('renameArtboards changes nothing when any requested change is invalid', function () {
+  const application = makeApplication([{ artboardRect: [0, 100, 100, 0], name: 'Keep' }]);
+  const result = JSON.parse(host.renameArtboards(application, [{ index: 0, name: 'Changed' }, { index: 4, name: 'Nope' }]));
+
+  assert.equal(result.ok, false);
+  assert.equal(application.activeDocument.artboards[0].name, 'Keep');
 });
 
 test('createPresetArtboards returns partial created items when adding an artboard fails', function () {

@@ -274,6 +274,41 @@ function listArtboards(application) {
   return '{"ok":true,"artboards":[' + items.join(',') + ']}';
 }
 
+function renameArtboards(application, changes) {
+  var document = activeDocument(application);
+  var prepared = [];
+  var renamed = [];
+  var i;
+
+  if (!document) {
+    return errorResult('Open an Illustrator document first.');
+  }
+  if (!changes || typeof changes.length !== 'number' || changes.length === 0) {
+    return errorResult('Provide one or more artboards to rename.');
+  }
+
+  for (i = 0; i < changes.length; i += 1) {
+    if (!changes[i] || typeof changes[i].index !== 'number' ||
+        Math.floor(changes[i].index) !== changes[i].index || changes[i].index < 0 ||
+        changes[i].index >= document.artboards.length || typeof changes[i].name !== 'string' ||
+        !changes[i].name) {
+      return errorResult('Provide valid artboard indexes and names.');
+    }
+    prepared.push({ index: changes[i].index, name: changes[i].name });
+  }
+
+  prepared.sort(function (left, right) {
+    return left.index - right.index;
+  });
+
+  for (i = 0; i < prepared.length; i += 1) {
+    document.artboards[prepared[i].index].name = prepared[i].name;
+    renamed.push('{"index":' + prepared[i].index + ',"name":' + jsonQuote(prepared[i].name) + '}');
+  }
+
+  return '{"ok":true,"renamed":[' + renamed.join(',') + ']}';
+}
+
 function sanitizeFilename(name) {
   var sanitized = String(name == null ? '' : name)
     .replace(/[<>:"\/\\|?*\s]+/g, '-')
@@ -440,6 +475,7 @@ function exportArtboards(application, request) {
 if (typeof $ !== 'undefined' && $.global) {
   $.global.createPresetArtboards = createPresetArtboards;
   $.global.listArtboards = listArtboards;
+  $.global.renameArtboards = renameArtboards;
   $.global.getExportCapabilities = getExportCapabilities;
   $.global.exportArtboards = exportArtboards;
 }
@@ -448,6 +484,7 @@ if (typeof module !== 'undefined') {
   module.exports = {
     createPresetArtboards: createPresetArtboards,
     listArtboards: listArtboards,
+    renameArtboards: renameArtboards,
     getExportCapabilities: getExportCapabilities,
     exportArtboards: exportArtboards,
     sanitizeFilename: sanitizeFilename,
