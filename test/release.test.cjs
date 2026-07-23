@@ -99,6 +99,7 @@ test('signed release script keeps secrets external and verifies before publishin
   assert.match(script, /Moo_Ai Artboard Size Renamer Signing/);
   assert.match(script, /\/Users\/aibd\/Library\/Application Support\/Moo_Ai\/ZXPSignCmd\/ZXPSignCmd/);
   assert.match(script, /\/Users\/aibd\/Library\/Application Support\/Moo_Ai\/Signing\/ArtboardSizeRenamer\.p12/);
+  assert.match(script, /timestamp_url="http:\/\/timestamp\.digicert\.com"/);
   assert.match(script, /-tsa "\$timestamp_url"/);
   ['.git', '.DS_Store', 'node_modules', 'test', 'docs', 'releases', '*.p12', '*password*', 'zxpsigncmd'].forEach((forbidden) => {
     assert.match(script, new RegExp(forbidden.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
