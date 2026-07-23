@@ -37,6 +37,8 @@
   var preflightCheckboxes = [];
   var artboardCheckboxes = [];
   var preflightReport = null;
+  var preflightBusy = false;
+  var exportBusy = false;
   var hostReady = false;
   var hostLoadError = '';
   var cachedState = readCache();
@@ -216,12 +218,14 @@
   }
 
   function updatePreflightState() {
-    runPreflightButton.disabled = !hostReady || selectedPreflightPresets().length === 0;
-    createMissingButton.disabled = !hostReady || !preflightReport ||
+    runPreflightButton.disabled = preflightBusy || !hostReady ||
+      selectedPreflightPresets().length === 0;
+    createMissingButton.disabled = preflightBusy || !hostReady || !preflightReport ||
       preflightReport.summary.missing === 0;
-    renameFixableButton.disabled = !hostReady || !preflightReport ||
+    renameFixableButton.disabled = preflightBusy || !hostReady || !preflightReport ||
       preflightReport.summary.rename === 0;
-    exportVerifiedButton.disabled = !hostReady || !preflightCanExport(preflightReport) ||
+    exportVerifiedButton.disabled = preflightBusy || exportBusy || !hostReady ||
+      !preflightCanExport(preflightReport) ||
       !destinationInput.value.trim();
   }
 
@@ -255,7 +259,7 @@
 
   function runPreflight() {
     var requiredPresets = selectedPreflightPresets();
-    if (!hostReady || !requiredPresets.length) {
+    if (preflightBusy || !hostReady || !requiredPresets.length) {
       updatePreflightState();
       return;
     }
@@ -337,7 +341,7 @@
   function updateExportState() {
     var selected = selectedArtboards();
     var collisions = findFilenameCollisions(selected, formatSelect.value);
-    if (!hostReady) {
+    if (!hostReady || exportBusy) {
       exportButton.disabled = true;
       return;
     }
@@ -390,18 +394,31 @@
     }
   }
 
-  function refreshArtboards() {
-    csInterface.evalScript('listArtboards(app)', function (rawResult) {
-      var result = parseHostResult(rawResult);
+  function refreshArtboards(onComplete) {
+    try {
+      csInterface.evalScript('listArtboards(app)', function (rawResult) {
+        var result = parseHostResult(rawResult);
+        clearPreflightReport();
+        if (result.ok) {
+          renderArtboards(result.artboards);
+        } else {
+          artboards = [];
+          renderArtboards([]);
+          setStatus(result.error);
+        }
+        if (onComplete) {
+          onComplete();
+        }
+      });
+    } catch (error) {
+      artboards = [];
       clearPreflightReport();
-      if (result.ok) {
-        renderArtboards(result.artboards);
-      } else {
-        artboards = [];
-        renderArtboards([]);
-        setStatus(result.error);
+      renderArtboards([]);
+      setStatus('Could not refresh Illustrator artboards. Please try again.');
+      if (onComplete) {
+        onComplete();
       }
-    });
+    }
   }
 
   function enableSupportedExportFormats(onReady) {
@@ -655,10 +672,17 @@
 
   runPreflightButton.addEventListener('click', runPreflight);
 
+  function finishPreflightMutation() {
+    refreshArtboards(function () {
+      preflightBusy = false;
+      updatePreflightState();
+    });
+  }
+
   createMissingButton.addEventListener('click', function () {
     var missing = [];
     var i;
-    if (!hostReady || !preflightReport) {
+    if (preflightBusy || !hostReady || !preflightReport) {
       updatePreflightState();
       return;
     }
@@ -671,23 +695,30 @@
       updatePreflightState();
       return;
     }
+    preflightBusy = true;
     clearPreflightReport();
     setStatus('Creating missing preset artboards…');
-    csInterface.evalScript(
-      'createPresetArtboards(app, ' + JSON.stringify(missing) + ')',
-      function (rawResult) {
-        var result = parseHostResult(rawResult);
-        setStatus(result.ok
-          ? 'Created ' + result.created.length + ' missing preset artboard(s).'
-          : result.error);
-        refreshArtboards();
-      }
-    );
+    try {
+      csInterface.evalScript(
+        'createPresetArtboards(app, ' + JSON.stringify(missing) + ')',
+        function (rawResult) {
+          var result = parseHostResult(rawResult);
+          setStatus(result.ok
+            ? 'Created ' + result.created.length + ' missing preset artboard(s).'
+            : result.error);
+          finishPreflightMutation();
+        }
+      );
+    } catch (error) {
+      preflightBusy = false;
+      updatePreflightState();
+      setStatus('Could not start creating missing artboards. Please try again.');
+    }
   });
 
   renameFixableButton.addEventListener('click', function () {
     var changes;
-    if (!hostReady || !preflightReport) {
+    if (preflightBusy || !hostReady || !preflightReport) {
       updatePreflightState();
       return;
     }
@@ -696,27 +727,39 @@
       updatePreflightState();
       return;
     }
+    preflightBusy = true;
     clearPreflightReport();
     setStatus('Renaming fixable artboards…');
-    csInterface.evalScript(
-      'renameArtboards(app, ' + JSON.stringify(changes) + ')',
-      function (rawResult) {
-        var result = parseHostResult(rawResult);
-        setStatus(result.ok
-          ? 'Renamed ' + result.renamed.length + ' fixable artboard(s).'
-          : result.error);
-        refreshArtboards();
-      }
-    );
+    try {
+      csInterface.evalScript(
+        'renameArtboards(app, ' + JSON.stringify(changes) + ')',
+        function (rawResult) {
+          var result = parseHostResult(rawResult);
+          setStatus(result.ok
+            ? 'Renamed ' + result.renamed.length + ' fixable artboard(s).'
+            : result.error);
+          finishPreflightMutation();
+        }
+      );
+    } catch (error) {
+      preflightBusy = false;
+      updatePreflightState();
+      setStatus('Could not start renaming fixable artboards. Please try again.');
+    }
   });
+
+  function finishExport() {
+    exportBusy = false;
+    updateExportState();
+    updatePreflightState();
+  }
 
   function completeExport(exportRequest, rawResult) {
     var result = parseHostResult(rawResult);
     var confirmationMessage;
     if (result.ok) {
       setStatus('Exported ' + result.exported.length + ' artboard(s).');
-      updateExportState();
-      updatePreflightState();
+      finishExport();
       return;
     }
     if (result.code === 'OUTPUT_EXISTS' && result.conflicts &&
@@ -730,22 +773,25 @@
         return;
       }
       setStatus('Export cancelled; no existing files were overwritten.');
-      updateExportState();
-      updatePreflightState();
+      finishExport();
       return;
     }
     setStatus(result.error);
-    updateExportState();
-    updatePreflightState();
+    finishExport();
   }
 
   function sendExportRequest(exportRequest) {
-    csInterface.evalScript(
-      'exportArtboards(app, ' + JSON.stringify(exportRequest) + ')',
-      function (rawResult) {
-        completeExport(exportRequest, rawResult);
-      }
-    );
+    try {
+      csInterface.evalScript(
+        'exportArtboards(app, ' + JSON.stringify(exportRequest) + ')',
+        function (rawResult) {
+          completeExport(exportRequest, rawResult);
+        }
+      );
+    } catch (error) {
+      setStatus('Could not start exporting. Please try again.');
+      finishExport();
+    }
   }
 
   exportButton.addEventListener('click', function () {
@@ -753,7 +799,7 @@
     var collisions = findFilenameCollisions(selected, formatSelect.value);
     var indexes = [];
     var i;
-    if (!hostReady) {
+    if (exportBusy || !hostReady) {
       updateExportState();
       setStatus(hostLoadError ? hostFailureMessage() : 'Social workflow is not ready yet.');
       return;
@@ -770,31 +816,91 @@
       destination: destinationInput.value.trim(),
       format: formatSelect.value
     };
-    exportButton.disabled = true;
+    exportBusy = true;
+    updateExportState();
+    updatePreflightState();
     setStatus('Exporting selected artboards…');
     sendExportRequest(exportRequest);
   });
 
-  exportVerifiedButton.addEventListener('click', function () {
-    var indexes = [];
+  function passPresetKeys(report) {
+    var keys = [];
     var i;
-    if (!hostReady || !preflightCanExport(preflightReport) ||
+    for (i = 0; i < report.results.length; i += 1) {
+      if (report.results[i].status === 'pass') {
+        keys.push(report.results[i].preset.id + ':' + report.results[i].canonicalName);
+      }
+    }
+    keys.sort();
+    return keys;
+  }
+
+  function hasSamePassSet(previousReport, freshReport) {
+    var previousKeys = passPresetKeys(previousReport);
+    var freshKeys = passPresetKeys(freshReport);
+    var i;
+    if (previousKeys.length !== freshKeys.length) {
+      return false;
+    }
+    for (i = 0; i < previousKeys.length; i += 1) {
+      if (previousKeys[i] !== freshKeys[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  exportVerifiedButton.addEventListener('click', function () {
+    var approvedReport = preflightReport;
+    if (preflightBusy || exportBusy || !hostReady || !preflightCanExport(approvedReport) ||
         !destinationInput.value.trim()) {
       updatePreflightState();
       return;
     }
-    for (i = 0; i < preflightReport.results.length; i += 1) {
-      if (preflightReport.results[i].status === 'pass') {
-        indexes.push(preflightReport.results[i].artboards[0].index);
-      }
+    exportBusy = true;
+    updateExportState();
+    updatePreflightState();
+    setStatus('Revalidating verified artboards…');
+    try {
+      csInterface.evalScript('listArtboards(app)', function (rawResult) {
+        var result = parseHostResult(rawResult);
+        var requiredPresets;
+        var freshReport;
+        var indexes = [];
+        var i;
+        if (!result.ok) {
+          setStatus(result.error);
+          finishExport();
+          return;
+        }
+        renderArtboards(result.artboards);
+        requiredPresets = selectedPreflightPresets();
+        freshReport = buildPreflightReport(requiredPresets, result.artboards);
+        preflightReport = freshReport;
+        renderPreflightReport(freshReport);
+        updatePreflightState();
+        if (!preflightCanExport(freshReport) ||
+            !hasSamePassSet(approvedReport, freshReport)) {
+          setStatus('Verified export stopped because the artboards changed. Review Preflight.');
+          finishExport();
+          return;
+        }
+        for (i = 0; i < freshReport.results.length; i += 1) {
+          if (freshReport.results[i].status === 'pass') {
+            indexes.push(freshReport.results[i].artboards[0].index);
+          }
+        }
+        setStatus('Exporting verified artboards…');
+        sendExportRequest({
+          artboardIndexes: indexes,
+          destination: destinationInput.value.trim(),
+          format: formatSelect.value
+        });
+      });
+    } catch (error) {
+      setStatus('Could not revalidate Illustrator artboards. Please try again.');
+      finishExport();
     }
-    exportVerifiedButton.disabled = true;
-    setStatus('Exporting verified artboards…');
-    sendExportRequest({
-      artboardIndexes: indexes,
-      destination: destinationInput.value.trim(),
-      format: formatSelect.value
-    });
   });
 
   updateButton.addEventListener('click', function () {

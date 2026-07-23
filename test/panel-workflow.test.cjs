@@ -46,6 +46,11 @@ function fourPresetCatalog() {
   };
 }
 
+function hostCallPayload(call, prefix) {
+  assert.ok(call && call.indexOf(prefix) === 0, 'expected host call starting with ' + prefix);
+  return JSON.parse(call.slice(prefix.length, -1));
+}
+
 class FakeElement {
   constructor(id, tagName) {
     this.id = id || '';
@@ -123,36 +128,63 @@ function runPanel(options) {
   const renameResults = options.renameResults
     ? options.renameResults.slice()
     : null;
+  const deferredPrefixes = [];
+  const pendingCallbacks = [];
   const bridge = {
     calls: [],
+    deferNext: function (prefix) {
+      deferredPrefixes.push(prefix);
+    },
+    completeNext: function (prefix) {
+      const index = pendingCallbacks.findIndex(function (pending) {
+        return pending.script.indexOf(prefix) === 0;
+      });
+      assert.notEqual(index, -1, 'expected a pending callback for ' + prefix);
+      const pending = pendingCallbacks.splice(index, 1)[0];
+      pending.callback(pending.rawResult);
+    },
     evalScript: function (script, callback) {
+      let rawResult;
       this.calls.push(script);
       if (script.indexOf('$.evalFile') >= 0) {
-        callback(options.hostLoadResult || JSON.stringify({ ok: true }));
+        rawResult = options.hostLoadResult || JSON.stringify({ ok: true });
       } else if (script === 'getExportCapabilities()') {
-        callback(JSON.stringify(options.capabilitiesResult || {
+        rawResult = JSON.stringify(options.capabilitiesResult || {
           ok: true,
           formats: { png: true, jpg: true, webp: true }
-        }));
+        });
       } else if (script === 'listArtboards(app)') {
         const artboardResult = artboardResults && artboardResults.length
           ? (artboardResults.length > 1 ? artboardResults.shift() : artboardResults[0])
           : options.artboardResult;
-        callback(JSON.stringify(artboardResult || {
+        rawResult = JSON.stringify(artboardResult || {
           ok: true,
           artboards: [{ index: 0, name: 'Board', width: 100, height: 100 }]
-        }));
+        });
       } else if (script.indexOf('renameArtboards(app, ') === 0) {
-        callback(JSON.stringify(renameResults && renameResults.length
+        rawResult = JSON.stringify(renameResults && renameResults.length
           ? (renameResults.length > 1 ? renameResults.shift() : renameResults[0])
-          : { ok: true, renamed: [] }));
+          : { ok: true, renamed: [] });
       } else if (script.indexOf('exportArtboards(app, ') === 0 && options.exportResults) {
-        callback(JSON.stringify(options.exportResults.shift()));
+        rawResult = JSON.stringify(options.exportResults.shift());
       } else if (script.indexOf('createPresetArtboards(app, ') === 0 && options.createRawResult) {
-        callback(options.createRawResult);
+        rawResult = options.createRawResult;
       } else {
-        callback(JSON.stringify({ ok: true, created: [], exported: [] }));
+        rawResult = JSON.stringify({ ok: true, created: [], exported: [] });
       }
+      const deferredIndex = deferredPrefixes.findIndex(function (prefix) {
+        return script.indexOf(prefix) === 0;
+      });
+      if (deferredIndex >= 0) {
+        deferredPrefixes.splice(deferredIndex, 1);
+        pendingCallbacks.push({
+          script: script,
+          callback: callback,
+          rawResult: rawResult
+        });
+        return;
+      }
+      callback(rawResult);
     },
     getSystemPath: function (pathType) {
       return pathType === 'extension' ? '/extension root' : '/user-data';
@@ -494,13 +526,174 @@ test('runs preflight, creates only missing presets, renames only fixable artboar
   panel.document.elements['run-preflight-button'].dispatch('click');
   assert.match(panel.document.elements['preflight-summary'].textContent, /1 Pass.*1 Rename.*1 Missing/);
   panel.document.elements['create-missing-button'].dispatch('click');
-  assert.match(panel.bridge.calls.find(function (call) { return call.indexOf('createPresetArtboards(app, ') === 0; }), /instagram-story/);
+  const createPayload = hostCallPayload(panel.bridge.calls.find(function (call) {
+    return call.indexOf('createPresetArtboards(app, ') === 0;
+  }), 'createPresetArtboards(app, ');
+  assert.deepEqual(createPayload.map(function (preset) { return preset.id; }), [
+    'instagram-story'
+  ]);
   panel.document.elements['run-preflight-button'].dispatch('click');
   panel.document.elements['rename-fixable-button'].dispatch('click');
-  assert.match(panel.bridge.calls.find(function (call) { return call.indexOf('renameArtboards\(app, ') === 0; }), /instagram-portrait_1080x1350 px/);
+  const renamePayload = hostCallPayload(panel.bridge.calls.find(function (call) {
+    return call.indexOf('renameArtboards(app, ') === 0;
+  }), 'renameArtboards(app, ');
+  assert.deepEqual(renamePayload, [{
+    index: 1,
+    name: 'instagram-portrait_1080x1350 px'
+  }]);
   panel.document.elements['run-preflight-button'].dispatch('click');
   panel.document.elements['export-verified-button'].dispatch('click');
-  assert.match(panel.bridge.calls.find(function (call) { return call.indexOf('exportArtboards(app, ') === 0; }), /"artboardIndexes":\[0,1,2\]/);
+  const exportPayload = hostCallPayload(panel.bridge.calls.find(function (call) {
+    return call.indexOf('exportArtboards(app, ') === 0;
+  }), 'exportArtboards(app, ');
+  assert.deepEqual(exportPayload.artboardIndexes, [0, 1, 2]);
+});
+
+test('keeps every preflight action locked until fix mutation and refresh callbacks finish', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: fourPresetCatalog(), source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    },
+    artboardResults: [
+      { ok: true, artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
+        { index: 1, name: 'Portrait draft', width: 1080, height: 1350 }
+      ] },
+      { ok: true, artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
+        { index: 1, name: 'Portrait draft', width: 1080, height: 1350 },
+        { index: 2, name: 'instagram-story_1080x1920 px', width: 1080, height: 1920 }
+      ] },
+      { ok: true, artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
+        { index: 1, name: 'instagram-portrait_1080x1350 px', width: 1080, height: 1350 },
+        { index: 2, name: 'instagram-story_1080x1920 px', width: 1080, height: 1920 }
+      ] }
+    ]
+  });
+  const required = panel.document.elements['preflight-preset-list'].children;
+  const controls = [
+    'run-preflight-button', 'create-missing-button',
+    'rename-fixable-button', 'export-verified-button'
+  ];
+  function assertPreflightLocked() {
+    controls.forEach(function (id) {
+      assert.equal(panel.document.elements[id].disabled, true, id + ' should be locked');
+    });
+  }
+  required[0].children[0].checked = true; required[0].children[0].dispatch('change');
+  required[1].children[0].checked = true; required[1].children[0].dispatch('change');
+  required[2].children[0].checked = true; required[2].children[0].dispatch('change');
+  panel.document.elements['run-preflight-button'].dispatch('click');
+
+  panel.bridge.deferNext('createPresetArtboards(app, ');
+  panel.bridge.deferNext('listArtboards(app)');
+  panel.document.elements['create-missing-button'].dispatch('click');
+  assertPreflightLocked();
+  panel.document.elements['create-missing-button'].dispatch('click');
+  assert.equal(panel.bridge.calls.filter(function (call) {
+    return call.indexOf('createPresetArtboards(app, ') === 0;
+  }).length, 1);
+  panel.bridge.completeNext('createPresetArtboards(app, ');
+  assertPreflightLocked();
+  panel.bridge.completeNext('listArtboards(app)');
+  assert.equal(panel.document.elements['run-preflight-button'].disabled, false);
+
+  panel.document.elements['run-preflight-button'].dispatch('click');
+  panel.bridge.deferNext('renameArtboards(app, ');
+  panel.bridge.deferNext('listArtboards(app)');
+  panel.document.elements['rename-fixable-button'].dispatch('click');
+  assertPreflightLocked();
+  panel.document.elements['rename-fixable-button'].dispatch('click');
+  assert.equal(panel.bridge.calls.filter(function (call) {
+    return call.indexOf('renameArtboards(app, ') === 0;
+  }).length, 1);
+  panel.bridge.completeNext('renameArtboards(app, ');
+  assertPreflightLocked();
+  panel.bridge.completeNext('listArtboards(app)');
+  assert.equal(panel.document.elements['run-preflight-button'].disabled, false);
+});
+
+test('revalidates current artboards and refuses verified export when the fresh report changes', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    },
+    artboardResults: [
+      { ok: true, artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 }
+      ] },
+      { ok: true, artboards: [
+        { index: 0, name: 'Feed A', width: 1080, height: 1080 },
+        { index: 1, name: 'Feed B', width: 1080, height: 1080 }
+      ] }
+    ]
+  });
+  const required = panel.document.elements['preflight-preset-list'].children;
+  required[0].children[0].checked = true;
+  required[0].children[0].dispatch('change');
+  panel.document.elements['run-preflight-button'].dispatch('click');
+  assert.match(panel.document.elements['preflight-summary'].textContent, /1 Pass/);
+
+  panel.document.elements['export-verified-button'].dispatch('click');
+
+  assert.match(panel.document.elements['preflight-summary'].textContent, /1 Duplicate/);
+  assert.match(panel.document.elements.status.textContent, /changed|stopped|review/i);
+  assert.equal(panel.bridge.calls.filter(function (call) {
+    return call.indexOf('exportArtboards(app, ') === 0;
+  }).length, 0);
+});
+
+test('shares one export lock through the initial call and confirmed overwrite retry', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    },
+    artboardResult: {
+      ok: true,
+      artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 }
+      ]
+    },
+    confirmOverwrite: true,
+    exportResults: [
+      {
+        ok: false,
+        code: 'OUTPUT_EXISTS',
+        error: 'Existing output files require overwrite confirmation.',
+        conflicts: ['instagram-feed_1080x1080 px.png']
+      },
+      { ok: true, exported: ['instagram-feed_1080x1080 px.png'] }
+    ]
+  });
+  const required = panel.document.elements['preflight-preset-list'].children;
+  required[0].children[0].checked = true;
+  required[0].children[0].dispatch('change');
+  panel.document.elements['run-preflight-button'].dispatch('click');
+
+  panel.bridge.deferNext('exportArtboards(app, ');
+  panel.document.elements['export-button'].dispatch('click');
+  assert.equal(panel.document.elements['export-button'].disabled, true);
+  assert.equal(panel.document.elements['export-verified-button'].disabled, true);
+  panel.document.elements['export-verified-button'].dispatch('click');
+  assert.equal(panel.bridge.calls.filter(function (call) {
+    return call.indexOf('exportArtboards(app, ') === 0;
+  }).length, 1);
+
+  panel.bridge.deferNext('exportArtboards(app, ');
+  panel.bridge.completeNext('exportArtboards(app, ');
+  assert.equal(panel.document.elements['export-button'].disabled, true);
+  assert.equal(panel.document.elements['export-verified-button'].disabled, true);
+  assert.equal(panel.bridge.calls.filter(function (call) {
+    return call.indexOf('exportArtboards(app, ') === 0;
+  }).length, 2);
+
+  panel.bridge.completeNext('exportArtboards(app, ');
+  assert.equal(panel.document.elements['export-button'].disabled, false);
+  assert.equal(panel.document.elements['export-verified-button'].disabled, false);
 });
 
 test('clears a preflight report when delivery requirements change', function () {
