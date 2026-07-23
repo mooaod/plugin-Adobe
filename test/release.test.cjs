@@ -157,6 +157,19 @@ test('README documents the Social Media Preflight delivery workflow', () => {
   assert.match(readme, /Remove or resize the duplicate, rerun Preflight, choose an export destination and format/);
 });
 
+test('Social Media Preflight implementation plan explains execution in English and Thai', () => {
+  const plan = fs.readFileSync(
+    'docs/superpowers/plans/2026-07-23-social-preflight.md',
+    'utf8'
+  );
+
+  assert.match(plan, /Goal \/ เป้าหมาย/);
+  assert.match(plan, /Global Constraints \/ ข้อจำกัดร่วม/);
+  assert.match(plan, /Outcome \/ ผลลัพธ์/);
+  assert.match(plan, /Live Illustrator verification \/ การตรวจสอบด้วย Illustrator จริง/);
+  assert.match(plan, /[\u0E00-\u0E7F]/);
+});
+
 test('signed release script keeps secrets external and verifies before publishing', () => {
   const script = fs.readFileSync('scripts/build-signed-zxp.sh', 'utf8');
   const verifyAt = script.indexOf('-verify');

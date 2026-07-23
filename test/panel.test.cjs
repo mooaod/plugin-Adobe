@@ -8,6 +8,7 @@ test('panel controller invokes the host rename operation and reports its result'
 
   assert.match(source, /evalScript/);
   assert.match(source, /renameAllArtboards\(app\)/);
-  assert.match(source, /button\.disabled\s*=\s*true/);
+  assert.match(source, /operationInProgress\s*=\s*true/);
+  assert.match(source, /button\.disabled\s*=\s*operationBusy\(\)/);
   assert.match(source, /result\.renamed/);
 });

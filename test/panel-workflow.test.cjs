@@ -46,6 +46,18 @@ function fourPresetCatalog() {
   };
 }
 
+function sameDimensionCatalog() {
+  return {
+    schemaVersion: 1,
+    catalogVersion: '1.0.0',
+    updatedAt: '2026-07-17',
+    presets: [
+      { id: 'instagram-feed', label: 'Instagram Feed', width: 1080, height: 1080 },
+      { id: 'square-alt', label: 'Square Alternate', width: 1080, height: 1080 }
+    ]
+  };
+}
+
 function hostCallPayload(call, prefix) {
   assert.ok(call && call.indexOf(prefix) === 0, 'expected host call starting with ' + prefix);
   return JSON.parse(call.slice(prefix.length, -1));
@@ -130,10 +142,14 @@ function runPanel(options) {
     : null;
   const deferredPrefixes = [];
   const pendingCallbacks = [];
+  const thrownPrefixes = [];
   const bridge = {
     calls: [],
     deferNext: function (prefix) {
       deferredPrefixes.push(prefix);
+    },
+    throwNext: function (prefix) {
+      thrownPrefixes.push(prefix);
     },
     completeNext: function (prefix) {
       const index = pendingCallbacks.findIndex(function (pending) {
@@ -146,6 +162,13 @@ function runPanel(options) {
     evalScript: function (script, callback) {
       let rawResult;
       this.calls.push(script);
+      const thrownIndex = thrownPrefixes.findIndex(function (prefix) {
+        return script.indexOf(prefix) === 0;
+      });
+      if (thrownIndex >= 0) {
+        thrownPrefixes.splice(thrownIndex, 1);
+        throw new Error('bridge start failed');
+      }
       if (script.indexOf('$.evalFile') >= 0) {
         rawResult = options.hostLoadResult || JSON.stringify({ ok: true });
       } else if (script === 'getExportCapabilities()') {
@@ -499,6 +522,281 @@ test('starts required delivery presets unchecked and disables preflight actions'
   assert.equal(panel.document.elements['export-verified-button'].disabled, true);
 });
 
+test('Run Preflight fetches Illustrator changes again before every rerun and renders matching names', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    },
+    artboardResults: [
+      { ok: true, artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 }
+      ] },
+      { ok: true, artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 }
+      ] },
+      { ok: true, artboards: [
+        { index: 0, name: 'Feed A', width: 1080, height: 1080 },
+        { index: 1, name: 'Feed B', width: 1080, height: 1080 }
+      ] }
+    ]
+  });
+  const required = panel.document.elements['preflight-preset-list'].children;
+  required[0].children[0].checked = true;
+  required[0].children[0].dispatch('change');
+
+  panel.document.elements['run-preflight-button'].dispatch('click');
+  assert.match(panel.document.elements['preflight-summary'].textContent, /1 Pass/);
+  panel.document.elements['run-preflight-button'].dispatch('click');
+
+  assert.equal(panel.bridge.calls.filter(function (call) {
+    return call === 'listArtboards(app)';
+  }).length, 3);
+  assert.match(panel.document.elements['preflight-summary'].textContent, /1 Duplicate/);
+  assert.match(panel.document.elements['preflight-results'].children[0].textContent, /Feed A/);
+  assert.match(panel.document.elements['preflight-results'].children[0].textContent, /Feed B/);
+  assert.equal(panel.document.elements['artboard-list'].children.length, 2);
+});
+
+test('Run Preflight preserves normal export selections when artboards are unchanged', function () {
+  const unchangedArtboards = [
+    { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
+    { index: 7, name: 'Reference', width: 400, height: 400 }
+  ];
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    },
+    artboardResults: [
+      { ok: true, artboards: unchangedArtboards },
+      { ok: true, artboards: unchangedArtboards }
+    ]
+  });
+  const required = panel.document.elements['preflight-preset-list'].children;
+  const normalExportSelection = panel.document.elements['artboard-list'].children;
+  required[0].children[0].checked = true;
+  required[0].children[0].dispatch('change');
+  normalExportSelection[1].children[0].checked = false;
+  normalExportSelection[1].children[0].dispatch('change');
+
+  panel.document.elements['run-preflight-button'].dispatch('click');
+
+  assert.equal(
+    panel.document.elements['artboard-list'].children[1].children[0].checked,
+    false
+  );
+  panel.document.elements['export-button'].dispatch('click');
+  const exportCall = panel.bridge.calls.filter(function (call) {
+    return call.indexOf('exportArtboards(app, ') === 0;
+  }).pop();
+  assert.deepEqual(
+    hostCallPayload(exportCall, 'exportArtboards(app, ').artboardIndexes,
+    [0]
+  );
+});
+
+test('Run Preflight reports document closure, clears stale results, and unlocks safely', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    },
+    artboardResults: [
+      { ok: true, artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 }
+      ] },
+      { ok: false, error: 'Open an Illustrator document first.' }
+    ]
+  });
+  const required = panel.document.elements['preflight-preset-list'].children;
+  required[0].children[0].checked = true;
+  required[0].children[0].dispatch('change');
+  panel.bridge.deferNext('listArtboards(app)');
+
+  panel.document.elements['run-preflight-button'].dispatch('click');
+  assert.equal(panel.document.elements['run-preflight-button'].disabled, true);
+  assert.equal(panel.document.elements['create-presets-button'].disabled, true);
+  assert.equal(panel.document.elements['rename-button'].disabled, true);
+  panel.bridge.completeNext('listArtboards(app)');
+
+  assert.equal(panel.document.elements['preflight-summary'].textContent, '');
+  assert.equal(panel.document.elements['artboard-list'].children.length, 0);
+  assert.match(panel.document.elements.status.textContent, /Open an Illustrator document first/);
+  assert.equal(panel.document.elements['run-preflight-button'].disabled, false);
+  assert.equal(panel.document.elements['rename-button'].disabled, false);
+});
+
+test('Run Preflight unlocks when the host bridge cannot start', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    }
+  });
+  const required = panel.document.elements['preflight-preset-list'].children;
+  required[0].children[0].checked = true;
+  required[0].children[0].dispatch('change');
+  panel.bridge.throwNext('listArtboards(app)');
+
+  panel.document.elements['run-preflight-button'].dispatch('click');
+
+  assert.match(panel.document.elements.status.textContent, /Could not refresh Illustrator artboards/);
+  assert.equal(panel.document.elements['run-preflight-button'].disabled, false);
+  assert.equal(panel.document.elements['rename-button'].disabled, false);
+  assert.equal(panel.document.elements['create-presets-button'].disabled, true);
+});
+
+test('Run Preflight explains an empty requirement selection without calling the host', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    }
+  });
+  const callsBefore = panel.bridge.calls.length;
+
+  panel.document.elements['run-preflight-button'].dispatch('click');
+
+  assert.equal(panel.bridge.calls.length, callsBefore);
+  assert.equal(
+    panel.document.elements.status.textContent,
+    'Select at least one required delivery size.'
+  );
+});
+
+test('rejects same-dimension requirements and leaves every preflight action safe', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: sameDimensionCatalog(), source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    },
+    artboardResult: {
+      ok: true,
+      artboards: [
+        { index: 0, name: 'Keep', width: 1080, height: 1080 }
+      ]
+    }
+  });
+  const required = panel.document.elements['preflight-preset-list'].children;
+  required[0].children[0].checked = true;
+  required[0].children[0].dispatch('change');
+  required[1].children[0].checked = true;
+  required[1].children[0].dispatch('change');
+
+  panel.document.elements['run-preflight-button'].dispatch('click');
+
+  assert.match(panel.document.elements.status.textContent, /1080.*1080/);
+  assert.equal(panel.document.elements['preflight-summary'].textContent, '');
+  assert.equal(panel.document.elements['create-missing-button'].disabled, true);
+  assert.equal(panel.document.elements['rename-fixable-button'].disabled, true);
+  assert.equal(panel.document.elements['export-verified-button'].disabled, true);
+  panel.document.elements['create-missing-button'].dispatch('click');
+  panel.document.elements['rename-fixable-button'].dispatch('click');
+  panel.document.elements['export-verified-button'].dispatch('click');
+  assert.equal(panel.bridge.calls.some(function (call) {
+    return call.indexOf('createPresetArtboards(app, ') === 0 ||
+      call.indexOf('renameArtboards(app, ') === 0 ||
+      call.indexOf('exportArtboards(app, ') === 0;
+  }), false);
+});
+
+test('legacy create and rename hold the unified operation lock through refresh', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    },
+    artboardResult: {
+      ok: true,
+      artboards: [
+        { index: 0, name: 'Board', width: 100, height: 100 }
+      ]
+    }
+  });
+  const createPreset = panel.document.elements['preset-list'].children[0].children[0];
+  const required = panel.document.elements['preflight-preset-list'].children[0].children[0];
+  const operationControls = [
+    'create-presets-button', 'rename-button', 'run-preflight-button',
+    'create-missing-button', 'rename-fixable-button',
+    'export-button', 'export-verified-button'
+  ];
+  function assertLocked() {
+    operationControls.forEach(function (id) {
+      assert.equal(panel.document.elements[id].disabled, true, id + ' should be locked');
+    });
+  }
+  createPreset.checked = true;
+  createPreset.dispatch('change');
+  required.checked = true;
+  required.dispatch('change');
+
+  panel.bridge.deferNext('createPresetArtboards(app, ');
+  panel.bridge.deferNext('listArtboards(app)');
+  panel.document.elements['create-presets-button'].dispatch('click');
+  assertLocked();
+  panel.document.elements['run-preflight-button'].dispatch('click');
+  panel.document.elements['rename-button'].dispatch('click');
+  assert.equal(panel.bridge.calls.filter(function (call) {
+    return call === 'renameAllArtboards(app)';
+  }).length, 0);
+  panel.bridge.completeNext('createPresetArtboards(app, ');
+  assertLocked();
+  panel.bridge.completeNext('listArtboards(app)');
+  assert.equal(panel.document.elements['create-presets-button'].disabled, false);
+  assert.equal(panel.document.elements['rename-button'].disabled, false);
+
+  panel.bridge.deferNext('renameAllArtboards(app)');
+  panel.bridge.deferNext('listArtboards(app)');
+  panel.document.elements['rename-button'].dispatch('click');
+  assertLocked();
+  panel.document.elements['create-presets-button'].dispatch('click');
+  assert.equal(panel.bridge.calls.filter(function (call) {
+    return call.indexOf('createPresetArtboards(app, ') === 0;
+  }).length, 1);
+  panel.bridge.completeNext('renameAllArtboards(app)');
+  assertLocked();
+  panel.bridge.completeNext('listArtboards(app)');
+  assert.equal(panel.document.elements['create-presets-button'].disabled, false);
+  assert.equal(panel.document.elements['rename-button'].disabled, false);
+});
+
+test('fresh Run Preflight locks both legacy mutations until its callback completes', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    },
+    artboardResult: {
+      ok: true,
+      artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 }
+      ]
+    }
+  });
+  const createPreset = panel.document.elements['preset-list'].children[0].children[0];
+  const required = panel.document.elements['preflight-preset-list'].children[0].children[0];
+  createPreset.checked = true;
+  createPreset.dispatch('change');
+  required.checked = true;
+  required.dispatch('change');
+  panel.bridge.deferNext('listArtboards(app)');
+
+  panel.document.elements['run-preflight-button'].dispatch('click');
+
+  assert.equal(panel.document.elements['create-presets-button'].disabled, true);
+  assert.equal(panel.document.elements['rename-button'].disabled, true);
+  panel.document.elements['create-presets-button'].dispatch('click');
+  panel.document.elements['rename-button'].dispatch('click');
+  assert.equal(panel.bridge.calls.filter(function (call) {
+    return call.indexOf('createPresetArtboards(app, ') === 0 ||
+      call === 'renameAllArtboards(app)';
+  }).length, 0);
+  panel.bridge.completeNext('listArtboards(app)');
+  assert.equal(panel.document.elements['create-presets-button'].disabled, false);
+  assert.equal(panel.document.elements['rename-button'].disabled, false);
+});
+
 test('runs preflight, creates only missing presets, renames only fixable artboards, and exports pass results', function () {
   const panel = runPanel({
     cacheState: { catalog: fourPresetCatalog(), source: 'cache', lastSuccessfulCheck: new Date().toISOString() },
@@ -509,7 +807,21 @@ test('runs preflight, creates only missing presets, renames only fixable artboar
       ] },
       { ok: true, artboards: [
         { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
+        { index: 1, name: 'Portrait draft', width: 1080, height: 1350 }
+      ] },
+      { ok: true, artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
         { index: 1, name: 'Portrait draft', width: 1080, height: 1350 },
+        { index: 2, name: 'instagram-story_1080x1920 px', width: 1080, height: 1920 }
+      ] },
+      { ok: true, artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
+        { index: 1, name: 'Portrait draft', width: 1080, height: 1350 },
+        { index: 2, name: 'instagram-story_1080x1920 px', width: 1080, height: 1920 }
+      ] },
+      { ok: true, artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
+        { index: 1, name: 'instagram-portrait_1080x1350 px', width: 1080, height: 1350 },
         { index: 2, name: 'instagram-story_1080x1920 px', width: 1080, height: 1920 }
       ] },
       { ok: true, artboards: [
@@ -525,6 +837,14 @@ test('runs preflight, creates only missing presets, renames only fixable artboar
   required[2].children[0].checked = true; required[2].children[0].dispatch('change');
   panel.document.elements['run-preflight-button'].dispatch('click');
   assert.match(panel.document.elements['preflight-summary'].textContent, /1 Pass.*1 Rename.*1 Missing/);
+  assert.match(
+    panel.document.elements['preflight-results'].children[0].textContent,
+    /instagram-feed_1080x1080 px/
+  );
+  assert.match(
+    panel.document.elements['preflight-results'].children[1].textContent,
+    /Portrait draft/
+  );
   panel.document.elements['create-missing-button'].dispatch('click');
   const createPayload = hostCallPayload(panel.bridge.calls.find(function (call) {
     return call.indexOf('createPresetArtboards(app, ') === 0;
@@ -559,6 +879,15 @@ test('keeps every preflight action locked until fix mutation and refresh callbac
       { ok: true, artboards: [
         { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
         { index: 1, name: 'Portrait draft', width: 1080, height: 1350 }
+      ] },
+      { ok: true, artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
+        { index: 1, name: 'Portrait draft', width: 1080, height: 1350 }
+      ] },
+      { ok: true, artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
+        { index: 1, name: 'Portrait draft', width: 1080, height: 1350 },
+        { index: 2, name: 'instagram-story_1080x1920 px', width: 1080, height: 1920 }
       ] },
       { ok: true, artboards: [
         { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
@@ -622,6 +951,10 @@ test('blocks both export paths until a preflight mutation refresh finishes', fun
       lastSuccessfulCheck: new Date().toISOString()
     },
     artboardResults: [
+      { ok: true, artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
+        { index: 1, name: 'Portrait draft', width: 1080, height: 1350 }
+      ] },
       { ok: true, artboards: [
         { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
         { index: 1, name: 'Portrait draft', width: 1080, height: 1350 }
@@ -715,6 +1048,9 @@ test('revalidates current artboards and refuses verified export when the fresh r
       lastSuccessfulCheck: new Date().toISOString()
     },
     artboardResults: [
+      { ok: true, artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 }
+      ] },
       { ok: true, artboards: [
         { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 }
       ] },
@@ -847,11 +1183,20 @@ test('shares one export lock through the initial call and confirmed overwrite re
   required[0].children[0].checked = true;
   required[0].children[0].dispatch('change');
   panel.document.elements['run-preflight-button'].dispatch('click');
+  const operationControls = [
+    'create-presets-button', 'rename-button', 'run-preflight-button',
+    'create-missing-button', 'rename-fixable-button',
+    'export-button', 'export-verified-button'
+  ];
+  function assertOperationLocked() {
+    operationControls.forEach(function (id) {
+      assert.equal(panel.document.elements[id].disabled, true, id + ' should be locked');
+    });
+  }
 
   panel.bridge.deferNext('exportArtboards(app, ');
   panel.document.elements['export-button'].dispatch('click');
-  assert.equal(panel.document.elements['export-button'].disabled, true);
-  assert.equal(panel.document.elements['export-verified-button'].disabled, true);
+  assertOperationLocked();
   panel.document.elements['export-verified-button'].dispatch('click');
   assert.equal(panel.bridge.calls.filter(function (call) {
     return call.indexOf('exportArtboards(app, ') === 0;
@@ -859,8 +1204,7 @@ test('shares one export lock through the initial call and confirmed overwrite re
 
   panel.bridge.deferNext('exportArtboards(app, ');
   panel.bridge.completeNext('exportArtboards(app, ');
-  assert.equal(panel.document.elements['export-button'].disabled, true);
-  assert.equal(panel.document.elements['export-verified-button'].disabled, true);
+  assertOperationLocked();
   assert.equal(panel.bridge.calls.filter(function (call) {
     return call.indexOf('exportArtboards(app, ') === 0;
   }).length, 2);
@@ -994,19 +1338,18 @@ test('clears preflight and refreshes artboards after the existing rename utility
     }
   });
   const required = panel.document.elements['preflight-preset-list'].children;
-  const initialListCalls = panel.bridge.calls.filter(function (call) {
-    return call === 'listArtboards(app)';
-  }).length;
-
   required[0].children[0].checked = true;
   required[0].children[0].dispatch('change');
   panel.document.elements['run-preflight-button'].dispatch('click');
+  const listCallsAfterPreflight = panel.bridge.calls.filter(function (call) {
+    return call === 'listArtboards(app)';
+  }).length;
   panel.document.elements['rename-button'].dispatch('click');
 
   assert.equal(panel.document.elements['preflight-summary'].textContent, '');
   assert.equal(panel.bridge.calls.filter(function (call) {
     return call === 'listArtboards(app)';
-  }).length, initialListCalls + 1);
+  }).length, listCallsAfterPreflight + 1);
 });
 
 test('creates checked presets and exports checked artboards with validated JSON requests', function () {

@@ -274,11 +274,14 @@ function listArtboards(application) {
   return '{"ok":true,"artboards":[' + items.join(',') + ']}';
 }
 
-function renameArtboards(application, changes) {
+function renameArtboardsUnsafe(application, changes) {
   var document = activeDocument(application);
   var prepared = [];
   var renamed = [];
+  var seenIndexes = {};
+  var rollbackFailed = [];
   var i;
+  var rollbackIndex;
 
   if (!document) {
     return errorResult('Open an Illustrator document first.');
@@ -294,19 +297,59 @@ function renameArtboards(application, changes) {
         !changes[i].name) {
       return errorResult('Provide valid artboard indexes and names.');
     }
-    prepared.push({ index: changes[i].index, name: changes[i].name });
+    if (seenIndexes['$' + changes[i].index]) {
+      return errorResult('Provide each artboard index only once; repeated indexes are not allowed.');
+    }
+    seenIndexes['$' + changes[i].index] = true;
+    try {
+      prepared.push({
+        index: changes[i].index,
+        name: changes[i].name,
+        originalName: document.artboards[changes[i].index].name
+      });
+    } catch (readError) {
+      return '{"ok":false,"code":"RENAME_FAILED","error":' +
+        jsonQuote('Could not prepare artboard ' + changes[i].index + ' for rename: ' + readError) +
+        ',"renamed":[],"rollbackFailed":[]}';
+    }
   }
 
   prepared.sort(function (left, right) {
     return left.index - right.index;
   });
 
-  for (i = 0; i < prepared.length; i += 1) {
-    document.artboards[prepared[i].index].name = prepared[i].name;
-    renamed.push('{"index":' + prepared[i].index + ',"name":' + jsonQuote(prepared[i].name) + '}');
+  try {
+    for (i = 0; i < prepared.length; i += 1) {
+      document.artboards[prepared[i].index].name = prepared[i].name;
+      renamed.push('{"index":' + prepared[i].index + ',"name":' +
+        jsonQuote(prepared[i].name) + '}');
+    }
+  } catch (renameError) {
+    for (rollbackIndex = i - 1; rollbackIndex >= 0; rollbackIndex -= 1) {
+      try {
+        document.artboards[prepared[rollbackIndex].index].name =
+          prepared[rollbackIndex].originalName;
+      } catch (rollbackError) {
+        rollbackFailed.push('{"index":' + prepared[rollbackIndex].index +
+          ',"error":' + jsonQuote(String(rollbackError)) + '}');
+      }
+    }
+    return '{"ok":false,"code":"RENAME_FAILED","error":' +
+      jsonQuote('Failed to rename artboard ' + prepared[i].index + ': ' + renameError) +
+      ',"renamed":[],"rollbackFailed":[' + rollbackFailed.join(',') + ']}';
   }
 
   return '{"ok":true,"renamed":[' + renamed.join(',') + ']}';
+}
+
+function renameArtboards(application, changes) {
+  try {
+    return renameArtboardsUnsafe(application, changes);
+  } catch (error) {
+    return '{"ok":false,"code":"RENAME_FAILED","error":' +
+      jsonQuote('Could not rename artboards: ' + error) +
+      ',"renamed":[],"rollbackFailed":[]}';
+  }
 }
 
 function sanitizeFilename(name) {

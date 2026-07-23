@@ -20,3 +20,18 @@ test('classifies canonical, renameable, missing, and duplicate required presets'
 test('uses the canonical name supplied by the preset dimensions', function () {
   assert.equal(buildPreflightReport([feed], [{ index: 7, name: 'wrong', width: 1080, height: 1080 }]).results[0].canonicalName, 'instagram-feed_1080x1080 px');
 });
+
+test('rejects required presets that share the same dimensions before classification', function () {
+  const report = buildPreflightReport([
+    feed,
+    { id: 'square-alt', label: 'Square Alternate', width: 1080, height: 1080 }
+  ], [
+    { index: 0, name: 'Keep', width: 1080, height: 1080 }
+  ]);
+
+  assert.equal(report.ok, false);
+  assert.equal(report.code, 'DUPLICATE_REQUIRED_SIZE');
+  assert.deepEqual(report.conflictingSize, { width: 1080, height: 1080 });
+  assert.match(report.error, /1080.*1080/);
+  assert.deepEqual(report.results, []);
+});

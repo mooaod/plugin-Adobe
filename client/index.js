@@ -37,8 +37,7 @@
   var preflightCheckboxes = [];
   var artboardCheckboxes = [];
   var preflightReport = null;
-  var preflightBusy = false;
-  var exportBusy = false;
+  var operationInProgress = false;
   var hostReady = false;
   var hostLoadError = '';
   var cachedState = readCache();
@@ -186,7 +185,7 @@
   }
 
   function updateCreateState() {
-    createButton.disabled = !hostReady || selectedPresets().length === 0;
+    createButton.disabled = operationBusy() || !hostReady || selectedPresets().length === 0;
   }
 
   function selectedPreflightPresets() {
@@ -218,7 +217,51 @@
   }
 
   function operationBusy() {
-    return preflightBusy || exportBusy;
+    return operationInProgress;
+  }
+
+  function updateLegacyRenameState() {
+    button.disabled = operationBusy();
+  }
+
+  function updateOperationInputs() {
+    var disabled = operationBusy();
+    var i;
+    for (i = 0; i < presetCheckboxes.length; i += 1) {
+      presetCheckboxes[i].disabled = disabled;
+    }
+    for (i = 0; i < preflightCheckboxes.length; i += 1) {
+      preflightCheckboxes[i].disabled = disabled;
+    }
+    for (i = 0; i < artboardCheckboxes.length; i += 1) {
+      artboardCheckboxes[i].disabled = disabled;
+    }
+    formatSelect.disabled = disabled;
+    destinationInput.disabled = disabled;
+    addCustomPresetButton.disabled = disabled;
+  }
+
+  function updateOperationState() {
+    updateLegacyRenameState();
+    updateOperationInputs();
+    updateCreateState();
+    updateExportState();
+    updatePreflightState();
+  }
+
+  function beginOperation() {
+    if (operationBusy()) {
+      updateOperationState();
+      return false;
+    }
+    operationInProgress = true;
+    updateOperationState();
+    return true;
+  }
+
+  function finishOperation() {
+    operationInProgress = false;
+    updateOperationState();
   }
 
   function updatePreflightState() {
@@ -243,8 +286,10 @@
 
   function renderPreflightReport(report) {
     var i;
+    var j;
     var result;
     var item;
+    var matchingNames;
     preflightSummary.textContent = report.summary.pass + ' Pass · ' +
       report.summary.rename + ' Rename · ' +
       report.summary.missing + ' Missing · ' +
@@ -255,21 +300,79 @@
       result = report.results[i];
       item = document.createElement('div');
       item.className = 'preflight-result ' + result.status;
+      matchingNames = [];
+      for (j = 0; j < result.artboards.length; j += 1) {
+        matchingNames.push(result.artboards[j].name);
+      }
       item.textContent = result.preset.label + ' — ' +
-        result.status.charAt(0).toUpperCase() + result.status.slice(1);
+        result.status.charAt(0).toUpperCase() + result.status.slice(1) +
+        (matchingNames.length ? ' — ' + matchingNames.join(', ') : '');
       preflightResults.appendChild(item);
     }
   }
 
   function runPreflight() {
     var requiredPresets = selectedPreflightPresets();
-    if (operationBusy() || !hostReady || !requiredPresets.length) {
+    var requiredPresetSnapshot;
+    if (operationBusy()) {
       updatePreflightState();
       return;
     }
-    preflightReport = buildPreflightReport(requiredPresets, artboards);
-    renderPreflightReport(preflightReport);
-    updatePreflightState();
+    if (!requiredPresets.length) {
+      setStatus('Select at least one required delivery size.');
+      updatePreflightState();
+      return;
+    }
+    if (!hostReady) {
+      setStatus(hostLoadError ? hostFailureMessage() : 'Social workflow is not ready yet.');
+      updatePreflightState();
+      return;
+    }
+    requiredPresetSnapshot = requiredPresetIdentitySnapshot(requiredPresets);
+    beginOperation();
+    clearPreflightReport();
+    setStatus('Checking current Illustrator artboards…');
+    try {
+      csInterface.evalScript('listArtboards(app)', function (rawResult) {
+        var result = parseHostResult(rawResult);
+        var report;
+        if (!result.ok) {
+          artboards = [];
+          renderArtboards([]);
+          clearPreflightReport();
+          setStatus(result.error);
+          finishOperation();
+          return;
+        }
+        updateRevalidatedArtboards(result.artboards);
+        if (!hasSameRequiredPresetSnapshot(
+          requiredPresetSnapshot,
+          selectedPreflightPresets()
+        )) {
+          clearPreflightReport();
+          setStatus('Preflight stopped because the required preset selection changed. Run it again.');
+          finishOperation();
+          return;
+        }
+        report = buildPreflightReport(requiredPresets, result.artboards);
+        if (report && report.ok === false) {
+          clearPreflightReport();
+          setStatus(report.error);
+          finishOperation();
+          return;
+        }
+        preflightReport = report;
+        renderPreflightReport(preflightReport);
+        setStatus('Preflight complete.');
+        finishOperation();
+      });
+    } catch (error) {
+      artboards = [];
+      renderArtboards([]);
+      clearPreflightReport();
+      setStatus('Could not refresh Illustrator artboards. Please try again.');
+      finishOperation();
+    }
   }
 
   function renderCatalog(catalog, source) {
@@ -312,8 +415,8 @@
       preflightPresetList.appendChild(preflightLabel);
       preflightCheckboxes.push(preflightCheckbox);
     }
-    updateCreateState();
     clearPreflightReport();
+    updateOperationState();
     catalogInfo.textContent = catalogDescription();
   }
 
@@ -605,37 +708,33 @@
     request.send(null);
   }
 
-  function restore(message) {
-    setStatus(message);
-    button.disabled = false;
-  }
-
   button.addEventListener('click', function () {
-    button.disabled = true;
+    if (!beginOperation()) {
+      return;
+    }
     clearPreflightReport();
     setStatus('Renaming…');
 
     try {
       csInterface.evalScript('renameAllArtboards(app)', function (rawResult) {
-        try {
-          var result = JSON.parse(rawResult);
-          setStatus(result.ok
-            ? 'Renamed ' + result.renamed + ' artboard(s).'
-            : result.error);
-          button.disabled = false;
-          refreshArtboards();
-        } catch (error) {
-          restore('Could not read Illustrator’s response. Please try again.');
-          refreshArtboards();
-        }
+        var result = parseHostResult(rawResult);
+        setStatus(result.ok
+          ? 'Renamed ' + result.renamed + ' artboard(s).'
+          : result.error);
+        refreshArtboards(finishOperation);
       });
     } catch (error) {
-      restore('Could not start renaming. Please try again.');
+      setStatus('Could not start renaming. Please try again.');
+      finishOperation();
     }
   });
 
   createButton.addEventListener('click', function () {
     var presets = selectedPresets();
+    if (operationBusy()) {
+      updateOperationState();
+      return;
+    }
     if (!hostReady) {
       updateCreateState();
       setStatus(hostLoadError ? hostFailureMessage() : 'Social workflow is not ready yet.');
@@ -645,20 +744,24 @@
       setStatus('Select at least one preset to create.');
       return;
     }
-    createButton.disabled = true;
+    beginOperation();
     clearPreflightReport();
     setStatus('Creating selected presets…');
-    csInterface.evalScript('createPresetArtboards(app, ' + JSON.stringify(presets) + ')', function (rawResult) {
-      var result = parseHostResult(rawResult);
-      updateCreateState();
-      if (!result.ok) {
-        setStatus(result.error);
-        refreshArtboards();
-        return;
-      }
-      setStatus('Created ' + result.created.length + ' preset artboard(s).');
-      refreshArtboards();
-    });
+    try {
+      csInterface.evalScript(
+        'createPresetArtboards(app, ' + JSON.stringify(presets) + ')',
+        function (rawResult) {
+          var result = parseHostResult(rawResult);
+          setStatus(result.ok
+            ? 'Created ' + result.created.length + ' preset artboard(s).'
+            : result.error);
+          refreshArtboards(finishOperation);
+        }
+      );
+    } catch (error) {
+      setStatus('Could not start creating preset artboards. Please try again.');
+      finishOperation();
+    }
   });
 
   addCustomPresetButton.addEventListener('click', function () {
@@ -671,6 +774,10 @@
     var validation = validateCustomPresets([candidate]);
     var i;
 
+    if (operationBusy()) {
+      updateOperationState();
+      return;
+    }
     if (!validation.ok) {
       setStatus(validation.error);
       return;
@@ -702,11 +809,7 @@
   runPreflightButton.addEventListener('click', runPreflight);
 
   function finishPreflightMutation() {
-    refreshArtboards(function () {
-      preflightBusy = false;
-      updateExportState();
-      updatePreflightState();
-    });
+    refreshArtboards(finishOperation);
   }
 
   createMissingButton.addEventListener('click', function () {
@@ -725,9 +828,8 @@
       updatePreflightState();
       return;
     }
-    preflightBusy = true;
+    beginOperation();
     clearPreflightReport();
-    updateExportState();
     setStatus('Creating missing preset artboards…');
     try {
       csInterface.evalScript(
@@ -741,10 +843,8 @@
         }
       );
     } catch (error) {
-      preflightBusy = false;
-      updateExportState();
-      updatePreflightState();
       setStatus('Could not start creating missing artboards. Please try again.');
+      finishOperation();
     }
   });
 
@@ -759,9 +859,8 @@
       updatePreflightState();
       return;
     }
-    preflightBusy = true;
+    beginOperation();
     clearPreflightReport();
-    updateExportState();
     setStatus('Renaming fixable artboards…');
     try {
       csInterface.evalScript(
@@ -775,17 +874,13 @@
         }
       );
     } catch (error) {
-      preflightBusy = false;
-      updateExportState();
-      updatePreflightState();
       setStatus('Could not start renaming fixable artboards. Please try again.');
+      finishOperation();
     }
   });
 
   function finishExport() {
-    exportBusy = false;
-    updateExportState();
-    updatePreflightState();
+    finishOperation();
   }
 
   function completeExport(exportRequest, rawResult) {
@@ -850,9 +945,7 @@
       destination: destinationInput.value.trim(),
       format: formatSelect.value
     };
-    exportBusy = true;
-    updateExportState();
-    updatePreflightState();
+    beginOperation();
     setStatus('Exporting selected artboards…');
     sendExportRequest(exportRequest);
   });
@@ -922,9 +1015,7 @@
       updatePreflightState();
       return;
     }
-    exportBusy = true;
-    updateExportState();
-    updatePreflightState();
+    beginOperation();
     setStatus('Revalidating verified artboards…');
     try {
       csInterface.evalScript('listArtboards(app)', function (rawResult) {
@@ -953,6 +1044,12 @@
           return;
         }
         freshReport = buildPreflightReport(requiredPresets, result.artboards);
+        if (freshReport && freshReport.ok === false) {
+          clearPreflightReport();
+          setStatus(freshReport.error);
+          finishExport();
+          return;
+        }
         preflightReport = freshReport;
         renderPreflightReport(freshReport);
         updatePreflightState();
@@ -981,6 +1078,10 @@
   });
 
   updateButton.addEventListener('click', function () {
+    if (operationBusy()) {
+      updateOperationState();
+      return;
+    }
     checkRemoteCatalog(false);
   });
   formatSelect.addEventListener('change', function () {

@@ -1,14 +1,32 @@
-# Social Media Preflight Implementation Plan
+# Social Media Preflight Implementation Plan / แผนพัฒนาระบบตรวจงาน Social Media
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a deterministic Social Media Preflight workflow that finds missing, incorrectly named, and duplicate required artboards before verified export.
+## Summary / สรุป
+
+This plan adds a deterministic, local-only Social Media Preflight workflow to
+the Illustrator panel. It separates delivery requirements from normal preset
+creation, checks the current document, offers only safe fixes, and exports only
+the verified set.
+
+แผนนี้เพิ่มขั้นตอน Social Media Preflight ที่ให้ผลแน่นอนและทำงานภายในเครื่อง
+ให้กับแผง Illustrator โดยแยกรายการขนาดที่ต้องส่งออกจากรายการสร้าง preset ปกติ
+ตรวจเอกสารปัจจุบัน เสนอเฉพาะการแก้ไขที่ปลอดภัย และส่งออกเฉพาะชุดที่ตรวจผ่าน
+
+**Goal / เป้าหมาย:** Add a deterministic Social Media Preflight workflow that finds missing, incorrectly named, and duplicate required artboards before verified export.
+
+เพิ่มขั้นตอน Social Media Preflight ที่ตรวจหา artboard ที่ขาด ชื่อไม่ถูกต้อง
+หรือมีขนาดซ้ำ ก่อนอนุญาตให้ส่งออกชุดที่ตรวจสอบแล้ว
 
 **Architecture:** A new browser-safe `client/preflight-model.js` classifies selected catalog presets against the current artboard list without Illustrator dependencies. The CEP panel renders and acts on that report, while `host/social-workflow.jsx` receives validated batch rename requests and continues to own Illustrator DOM mutations and exports.
 
+**Architecture / สถาปัตยกรรม:** โมเดลฝั่ง browser แยกกติกาการจัดประเภทออกจาก
+Illustrator, แผง CEP จัดการสถานะและการแสดงผล และ host เป็นเจ้าของการเปลี่ยนแปลง
+Illustrator DOM กับการส่งออกทั้งหมด
+
 **Tech Stack:** Adobe Illustrator CEP panel (HTML/CSS/ES5 JavaScript), ExtendScript, Node.js built-in test runner and `node:vm`.
 
-## Global Constraints
+## Global Constraints / ข้อจำกัดร่วม
 
 - Keep the existing UI copy English; maintain design documentation in Thai and English.
 - Preflight uses exact width/height equality and canonical names: `<preset-id>_<width>x<height> px`.
@@ -18,9 +36,20 @@
 - Reuse existing collision detection and overwrite confirmation for verified exports.
 - Do not alter `client/CSInterface.js`.
 
+ข้อจำกัดเหล่านี้บังคับใช้ตลอดทั้งแผน: ข้อความใน UI ยังคงเป็นภาษาอังกฤษ,
+ตรวจขนาดแบบตรงตัวและใช้ชื่อมาตรฐาน, รายการ required-delivery ต้องแยกจาก
+Create Presets และเริ่มโดยไม่เลือก, ห้ามลบ ปรับขนาด ย้าย หรือเลือก artboard
+ที่ซ้ำให้อัตโนมัติ, ข้อมูลทั้งหมดต้องอยู่ภายในเครื่อง, verified export ต้องใช้
+การตรวจชื่อไฟล์ชนและการยืนยัน overwrite เดิม และห้ามแก้ `client/CSInterface.js`
+
 ---
 
 ### Task 1: Add the pure preflight classification model
+
+**Outcome / ผลลัพธ์:** A browser-safe pure function classifies each required
+preset as Pass, Rename, Missing, or Duplicate with exact canonical naming.
+ฟังก์ชันบริสุทธิ์ที่ใช้ได้ใน browser จะจัดประเภท preset ที่ต้องส่งเป็น Pass,
+Rename, Missing หรือ Duplicate โดยใช้ชื่อมาตรฐานแบบตรงตัว
 
 **Files:**
 - Create: `client/preflight-model.js`
@@ -116,6 +145,11 @@ git commit -m "feat: add social preflight model"
 
 ### Task 2: Add validated batch rename support in the Illustrator host
 
+**Outcome / ผลลัพธ์:** The host validates the complete rename request before
+mutation, applies names in deterministic order, and returns structured JSON.
+ฝั่ง host จะตรวจคำขอเปลี่ยนชื่อทั้งหมดก่อนแก้เอกสาร ทำงานตามลำดับที่แน่นอน
+และส่งผลลัพธ์เป็น JSON ที่มีโครงสร้าง
+
 **Files:**
 - Modify: `host/social-workflow.jsx:261-275,440-456`
 - Modify: `test/social-workflow.test.cjs:9-19,181-224`
@@ -203,6 +237,11 @@ git commit -m "feat: support preflight artboard renaming"
 ```
 
 ### Task 3: Render Preflight and connect safe actions in the panel
+
+**Outcome / ผลลัพธ์:** The panel renders independent delivery requirements and
+connects Run, safe fixes, and verified export while invalidating stale reports.
+แผงจะแสดงรายการขนาดที่ต้องส่งแยกจากรายการเดิม เชื่อม Run การแก้ไขที่ปลอดภัย
+และ verified export พร้อมล้างรายงานที่ล้าสมัย
 
 **Files:**
 - Modify: `client/index.html:36-61,74-77`
@@ -325,6 +364,11 @@ git commit -m "feat: add social media preflight panel"
 
 ### Task 4: Verify the release and document the workflow
 
+**Outcome / ผลลัพธ์:** Automated release checks, English user documentation,
+and a live Illustrator checklist make the completed workflow verifiable.
+ชุดตรวจ release อัตโนมัติ เอกสารผู้ใช้ภาษาอังกฤษ และรายการตรวจใน Illustrator
+จริงทำให้ยืนยันขั้นตอนที่พัฒนาเสร็จแล้วได้
+
 **Files:**
 - Modify: `README.md:5-35`
 - Modify: `test/release.test.cjs` only if it maintains an explicit required-file list.
@@ -363,6 +407,15 @@ Run: `git diff --check`
 Expected: no output and exit code 0.
 
 - [ ] **Step 5: Perform live Illustrator verification**
+
+**Live Illustrator verification / การตรวจสอบด้วย Illustrator จริง:** Follow
+the approved six-step workflow in the running panel and record the actual
+Illustrator version plus PNG/JPG/WebP capability results. This live check
+confirms the CEP-to-ExtendScript boundary that Node tests cannot execute.
+
+ให้ทำตามขั้นตอนที่อนุมัติทั้งหกข้อในแผงที่เปิดใช้งานจริง และบันทึกเวอร์ชัน
+Illustrator รวมถึงผลรองรับ PNG/JPG/WebP การตรวจจริงนี้ยืนยันการเชื่อมต่อ
+ระหว่าง CEP กับ ExtendScript ซึ่งชุดทดสอบ Node ไม่สามารถเรียกใช้งานได้
 
 Follow the six steps in `docs/superpowers/specs/2026-07-23-social-preflight-design.md` under **Manual verification**. Record the actual Illustrator version and whether PNG/JPG/WebP capabilities matched the panel state in the commit or handoff notes.
 

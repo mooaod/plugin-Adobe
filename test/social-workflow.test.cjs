@@ -213,6 +213,96 @@ test('renameArtboards changes nothing when any requested change is invalid', fun
   assert.equal(application.activeDocument.artboards[0].name, 'Keep');
 });
 
+test('renameArtboards rejects repeated indexes before changing any name', function () {
+  const application = makeApplication([
+    { artboardRect: [0, 100, 100, 0], name: 'Keep First' },
+    { artboardRect: [120, 100, 220, 0], name: 'Keep Second' }
+  ]);
+  const result = JSON.parse(host.renameArtboards(application, [
+    { index: 0, name: 'First Change' },
+    { index: 0, name: 'Second Change' }
+  ]));
+
+  assert.equal(result.ok, false);
+  assert.match(result.error, /repeated|duplicate/i);
+  assert.equal(application.activeDocument.artboards[0].name, 'Keep First');
+  assert.equal(application.activeDocument.artboards[1].name, 'Keep Second');
+});
+
+test('renameArtboards rolls back earlier assignments when a later setter fails', function () {
+  const first = { artboardRect: [0, 100, 100, 0], name: 'First Original' };
+  let secondName = 'Second Original';
+  const second = { artboardRect: [120, 100, 220, 0] };
+  Object.defineProperty(second, 'name', {
+    get: function () { return secondName; },
+    set: function (value) {
+      if (value === 'Second Changed') {
+        throw new Error('second setter failed');
+      }
+      secondName = value;
+    }
+  });
+  const application = makeApplication([first, second]);
+
+  const result = JSON.parse(host.renameArtboards(application, [
+    { index: 0, name: 'First Changed' },
+    { index: 1, name: 'Second Changed' }
+  ]));
+
+  assert.deepEqual(result, {
+    ok: false,
+    code: 'RENAME_FAILED',
+    error: 'Failed to rename artboard 1: Error: second setter failed',
+    renamed: [],
+    rollbackFailed: []
+  });
+  assert.equal(first.name, 'First Original');
+  assert.equal(second.name, 'Second Original');
+});
+
+test('renameArtboards reports rollback failures without leaking a host exception', function () {
+  let firstName = 'First Original';
+  let firstWasChanged = false;
+  const first = { artboardRect: [0, 100, 100, 0] };
+  Object.defineProperty(first, 'name', {
+    get: function () { return firstName; },
+    set: function (value) {
+      if (value === 'First Original' && firstWasChanged) {
+        throw new Error('rollback setter failed');
+      }
+      firstName = value;
+      firstWasChanged = value === 'First Changed';
+    }
+  });
+  let secondName = 'Second Original';
+  const second = { artboardRect: [120, 100, 220, 0] };
+  Object.defineProperty(second, 'name', {
+    get: function () { return secondName; },
+    set: function (value) {
+      if (value === 'Second Changed') {
+        throw new Error('second setter failed');
+      }
+      secondName = value;
+    }
+  });
+  const application = makeApplication([first, second]);
+
+  const result = JSON.parse(host.renameArtboards(application, [
+    { index: 0, name: 'First Changed' },
+    { index: 1, name: 'Second Changed' }
+  ]));
+
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'RENAME_FAILED');
+  assert.deepEqual(result.renamed, []);
+  assert.deepEqual(result.rollbackFailed, [{
+    index: 0,
+    error: 'Error: rollback setter failed'
+  }]);
+  assert.equal(first.name, 'First Changed');
+  assert.equal(second.name, 'Second Original');
+});
+
 test('createPresetArtboards returns partial created items when adding an artboard fails', function () {
   const application = makeApplication([], { addFailureAt: 1 });
 
