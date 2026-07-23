@@ -77,3 +77,11 @@ The signed release is `ArtboardSizeRenamer-v1.0.0-signed.zxp`. Install it with a
 ไฟล์สำหรับแจกคือ `ArtboardSizeRenamer-v1.0.0-signed.zxp` ให้ติดตั้งด้วยเครื่องมือติดตั้ง Adobe extension ที่รองรับ ZXP จากนั้นปิด Illustrator ให้หมด เปิดใหม่ แล้วไปที่ **Window → Extensions → Artboard Size Renamer** ควรตรวจสอบไฟล์ด้วย `.sha256` ที่ให้มาด้วยก่อนติดตั้ง
 
 This direct-distribution build uses a self-signed certificate from `Moo_Ai`; it is not an Adobe Marketplace listing. / รุ่นแจกโดยตรงนี้ใช้ self-signed certificate ของ `Moo_Ai` และยังไม่ใช่รายการบน Adobe Marketplace
+
+The Adobe signing tool accepts the certificate password only as a command-line
+argument. Run the signing workflow only in a trusted local user session: the
+password is briefly visible to same-user process inspection, but is never
+logged or written to disk. / เครื่องมือเซ็นของ Adobe รับรหัสผ่านใบรับรองผ่าน
+command line เท่านั้น จึงควรรัน workflow นี้เฉพาะใน session ของผู้ใช้ภายในเครื่อง
+ที่เชื่อถือได้: ผู้ใช้คนเดียวกันอาจตรวจพบรหัสผ่านได้ชั่วคราว แต่ระบบจะไม่บันทึก
+หรือเขียนรหัสผ่านลงดิสก์

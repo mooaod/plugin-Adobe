@@ -32,7 +32,12 @@ run_zxp_signer() {
   fi
 }
 
-for required_file in "$tool_path" "$certificate_path" "$project_root/release-files.txt"; do
+fail() {
+  printf '%s\n' "$1" >&2
+  exit 1
+}
+
+for required_file in "$tool_path" "$certificate_path"; do
   if [ ! -e "$required_file" ]; then
     printf 'Missing required signing input: %s\n' "$required_file" >&2
     exit 1
@@ -44,22 +49,78 @@ if [ -e "$output_zxp" ] || [ -e "$checksum_path" ]; then
   exit 1
 fi
 
-signing_password="$(security find-generic-password -a "$keychain_account" -s "$keychain_service" -w)"
 work_root="$(mktemp -d /private/tmp/artboard-size-renamer-zxp.XXXXXX)"
+expected_allowlist="$work_root/release-files.expected"
+release_allowlist="$project_root/release-files.txt"
 staging_root="$work_root/package"
 temporary_zxp="$work_root/ArtboardSizeRenamer-v1.0.0-signed.zxp"
+
+printf '%s\n' \
+  CSXS \
+  assets \
+  catalog \
+  client \
+  host \
+  README.md > "$expected_allowlist"
+
+if [ ! -f "$release_allowlist" ] || [ -L "$release_allowlist" ] || ! cmp -s "$release_allowlist" "$expected_allowlist"; then
+  fail 'release-files.txt must contain exactly the approved ordered runtime paths'
+fi
+
+validate_release_input() {
+  release_path="$1"
+  release_input="$project_root/$release_path"
+
+  if [ ! -e "$release_input" ] || [ -L "$release_input" ] || { [ ! -f "$release_input" ] && [ ! -d "$release_input" ]; }; then
+    fail "Invalid release input: $release_path"
+  fi
+
+  if find "$release_input" -type l -print -quit | grep -q .; then
+    fail "Symlinked release content is not allowed: $release_path"
+  fi
+
+  if find "$release_input" \( \
+    -name .git -o \
+    -name .DS_Store -o \
+    -name node_modules -o \
+    -name test -o \
+    -name docs -o \
+    -name releases -o \
+    -iname '*.p12' -o \
+    -iname '*.pfx' -o \
+    -iname '*.pem' -o \
+    -iname '*.key' -o \
+    -iname '*.cer' -o \
+    -iname '*.crt' -o \
+    -iname '*password*' -o \
+    -iname '*passwd*' -o \
+    -iname 'zxpsigncmd' \
+  \) -print -quit | grep -q .; then
+    fail "Forbidden release content: $release_path"
+  fi
+
+  while IFS= read -r candidate; do
+    if grep -I -q -E -- '-----BEGIN( [A-Z0-9]+)? PRIVATE KEY-----' "$candidate"; then
+      fail "Forbidden private key material: $release_path"
+    fi
+  done < <(find "$release_input" -type f -print)
+}
+
+while IFS= read -r release_path; do
+  validate_release_input "$release_path"
+done < "$release_allowlist"
+
+# ZXPSignCmd has no supported stdin/password-file interface. Run only in a
+# trusted local user session: the password is transiently visible to same-user
+# process inspection, but is never logged or written to disk.
+signing_password="$(security find-generic-password -a "$keychain_account" -s "$keychain_service" -w)"
 mkdir -p "$staging_root"
 
 while IFS= read -r release_path; do
-  [ -n "$release_path" ] || continue
-  if [ ! -e "$project_root/$release_path" ]; then
-    printf 'Allowlisted release input is missing: %s\n' "$release_path" >&2
-    exit 1
-  fi
   destination_parent="$staging_root/$(dirname "$release_path")"
   mkdir -p "$destination_parent"
   cp -R "$project_root/$release_path" "$destination_parent/"
-done < "$project_root/release-files.txt"
+done < "$release_allowlist"
 
 run_zxp_signer -sign "$staging_root" "$temporary_zxp" "$certificate_path" "$signing_password" -tsa "$timestamp_url"
 unset signing_password
