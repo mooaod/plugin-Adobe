@@ -24,6 +24,41 @@ Use **Add custom preset** to save a preset with a unique ID, label, width, and
 height. Custom presets are stored separately on your computer and merged with
 bundled or downloaded presets by ID, so catalog updates cannot delete them.
 
+## Preflight before delivery
+
+Before exporting a social-media delivery set, select the required presets and
+choose **Run Preflight**. Each requirement receives one of four results:
+**Pass** means that its canonical artboard is ready; **Rename** means that one
+same-size artboard can be renamed to the canonical name; **Missing** means that
+no same-size artboard exists; and **Duplicate** means that more than one
+same-size artboard exists.
+
+Use **Create Missing** for Missing results and **Rename Fixable** for Rename
+results, then run Preflight again to refresh the report. Duplicate requires
+manual resolution: remove or resize the extra artboard, then rerun Preflight.
+**Export Verified Set** remains disabled while Missing or Duplicate exists.
+When the report contains only Pass and optional Rename results, choose the
+export destination and format, then use **Export Verified Set** to export only
+the passing required artboards. Existing filename-collision and overwrite
+confirmation safeguards still apply.
+
+### Manual Illustrator verification
+
+1. Open a document with one correctly named Instagram Feed artboard, one
+   differently named Instagram Portrait artboard, and no Story artboard.
+2. Select those three requirements and run Preflight. Confirm that Pass,
+   Rename, and Missing appear respectively.
+3. Select Create Missing, then run Preflight again. Confirm that Story becomes
+   Pass.
+4. Select Rename Fixable, then run Preflight again. Confirm that Portrait
+   becomes Pass and its name is canonical.
+5. Add a second 1080 × 1080 artboard, run Preflight again, and confirm that
+   Duplicate appears and Export Verified Set is disabled.
+6. Remove or resize the duplicate, rerun Preflight, choose an export
+   destination and format, then confirm that Export Verified Set exports only
+   the passing required artboards. Confirm that PNG, JPG, and (when offered by
+   the running Illustrator version) WebP capabilities match the panel state.
+
 ## Preset updates and privacy
 
 The panel starts with its bundled catalog, prefers a valid cached catalog when

@@ -136,6 +136,23 @@ test('README is English-only and disclaims affiliation and identifies trademark 
   assert.doesNotMatch(readme, /[\u0E00-\u0E7F]/);
 });
 
+test('README documents the Social Media Preflight delivery workflow', () => {
+  const readme = fs.readFileSync('README.md', 'utf8').replace(/\s+/g, ' ');
+
+  assert.match(readme, /Preflight before delivery/);
+  assert.match(readme, /Run Preflight/);
+  ['Pass', 'Rename', 'Missing', 'Duplicate'].forEach((status) => {
+    assert.match(readme, new RegExp(`\\*\\*${status}\\*\\* means`));
+  });
+  assert.match(readme, /Duplicate requires manual resolution/);
+  assert.match(readme, /\*\*Export Verified Set\*\* remains disabled while Missing or Duplicate exists/);
+  assert.match(readme, /Open a document with one correctly named Instagram Feed artboard/);
+  assert.match(readme, /Select Create Missing, then run Preflight again/);
+  assert.match(readme, /Select Rename Fixable, then run Preflight again/);
+  assert.match(readme, /Add a second 1080 × 1080 artboard/);
+  assert.match(readme, /Remove or resize the duplicate, rerun Preflight, choose an export destination and format/);
+});
+
 test('signed release script keeps secrets external and verifies before publishing', () => {
   const script = fs.readFileSync('scripts/build-signed-zxp.sh', 'utf8');
   const verifyAt = script.indexOf('-verify');
