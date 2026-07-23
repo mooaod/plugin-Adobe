@@ -28,18 +28,21 @@ bundled or downloaded presets by ID, so catalog updates cannot delete them.
 
 Before exporting a social-media delivery set, select the required presets and
 choose **Run Preflight**. Each requirement receives one of four results:
-**Pass** means that its canonical artboard is ready; **Rename** means that one
-same-size artboard can be renamed to the canonical name; **Missing** means that
-no same-size artboard exists; and **Duplicate** means that more than one
-same-size artboard exists.
+**Pass** means that there is exactly one same-size artboard with the canonical
+name; **Rename** means that one same-size artboard can be renamed to the
+canonical name; **Missing** means that no same-size artboard exists; and
+**Duplicate** means that more than one same-size artboard exists. Multiple
+same-size artboards are Duplicate even when one has the canonical name.
 
-Use **Create Missing** for Missing results and **Rename Fixable** for Rename
-results, then run Preflight again to refresh the report. Duplicate requires
+Use this safe sequence, performing the mutation steps only when their result
+is present: **Run Preflight → Create Missing → Run Preflight → Rename Fixable →
+Run Preflight → Export Verified Set**. Each mutation clears the previous report,
+so always rerun Preflight before taking the next action. Duplicate requires
 manual resolution: remove or resize the extra artboard, then rerun Preflight.
 **Export Verified Set** remains disabled while Missing or Duplicate exists.
-When the report contains only Pass and optional Rename results, choose the
-export destination and format, then use **Export Verified Set** to export only
-the passing required artboards. Existing filename-collision and overwrite
+After the final Preflight confirms the set is ready, choose the export
+destination and format, then use **Export Verified Set** to export only the
+passing required artboards. Existing filename-collision and overwrite
 confirmation safeguards still apply.
 
 ### Manual Illustrator verification

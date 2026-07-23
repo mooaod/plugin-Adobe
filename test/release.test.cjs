@@ -146,6 +146,10 @@ test('README documents the Social Media Preflight delivery workflow', () => {
   });
   assert.match(readme, /Duplicate requires manual resolution/);
   assert.match(readme, /\*\*Export Verified Set\*\* remains disabled while Missing or Duplicate exists/);
+  assert.match(readme, /exactly one same-size artboard with the canonical name/);
+  assert.match(readme, /Multiple same-size artboards are Duplicate even when one has the canonical name/);
+  assert.match(readme, /Run Preflight → Create Missing → Run Preflight → Rename Fixable → Run Preflight → Export Verified Set/);
+  assert.match(readme, /Each mutation clears the previous report/);
   assert.match(readme, /Open a document with one correctly named Instagram Feed artboard/);
   assert.match(readme, /Select Create Missing, then run Preflight again/);
   assert.match(readme, /Select Rename Fixable, then run Preflight again/);
