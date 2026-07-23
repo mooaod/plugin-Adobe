@@ -16,6 +16,10 @@ const exportModelSource = fs.readFileSync(
   path.join(__dirname, '..', 'client', 'export-model.js'),
   'utf8'
 );
+const preflightModelSource = fs.readFileSync(
+  path.join(__dirname, '..', 'client', 'preflight-model.js'),
+  'utf8'
+);
 
 function catalog(version) {
   return {
@@ -197,6 +201,7 @@ function runPanel(options) {
   vm.createContext(context);
   vm.runInContext(catalogSource, context);
   vm.runInContext(exportModelSource, context);
+  vm.runInContext(preflightModelSource, context);
   vm.runInContext(controllerSource, context);
 
   return {
