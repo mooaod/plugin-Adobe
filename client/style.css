@@ -58,18 +58,19 @@ h3 { margin: 0 0 8px; font-size: 15px; }
 }
 
 .header-menu {
+  box-sizing: border-box;
+  display: grid;
   width: 40px;
   min-height: 38px;
+  place-items: center;
   padding: 2px 6px;
-  border-color: #3f3f3f;
+  border: 1px solid #3f3f3f;
   border-radius: 4px;
   color: #d8d8d8;
   background: transparent;
   font-size: 24px;
   line-height: 1;
 }
-
-.header-menu:disabled { opacity: 1; }
 
 .panel-card {
   margin: 0 0 12px;
@@ -214,6 +215,8 @@ h3 { margin: 0 0 8px; font-size: 15px; }
   padding: 9px 10px;
   border-left: 3px solid #777;
   background: rgba(0, 0, 0, .14);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .preflight-result.pass { border-color: #72db81; }

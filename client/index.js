@@ -324,6 +324,7 @@
     icon.textContent = meta.icon;
     countLabel.textContent = count + ' ' + meta.label;
     badge.className = 'preflight-status-badge';
+    badge.setAttribute('aria-hidden', 'true');
     badge.textContent = meta.label;
     row.appendChild(icon);
     row.appendChild(countLabel);

@@ -560,19 +560,45 @@ test('starts required delivery presets unchecked and disables preflight actions'
   assert.equal(panel.document.elements['export-verified-button'].disabled, true);
 });
 
-test('accordion cards toggle independently without resetting preflight selections', function () {
+test('accordion cards collapse independently while preserving destination, report, and selections', function () {
   const panel = runPanel({ bundledCatalog: fourPresetCatalog() });
   const presets = panel.document.elements['presets-body'];
+  const preflight = panel.document.elements['preflight-body'];
   const exportBody = panel.document.elements['export-body'];
+  const presetsTrigger = panel.document.elements['presets-trigger'];
+  const preflightTrigger = panel.document.elements['preflight-trigger'];
   const exportTrigger = panel.document.elements['export-trigger'];
+  const required = panel.document.elements['preflight-preset-list'].children[0].children[0];
+  const normalExportSelection = panel.document.elements['artboard-list'].children[0].children[0];
 
-  panel.document.elements['preflight-preset-list'].children[0].children[0].checked = true;
+  required.checked = true;
+  required.dispatch('change');
+  normalExportSelection.checked = false;
+  normalExportSelection.dispatch('change');
+  panel.document.elements['destination-input'].value = '/preserved-destination';
+  panel.document.elements['destination-input'].dispatch('input');
+  panel.document.elements['run-preflight-button'].dispatch('click');
+
+  presetsTrigger.dispatch('click');
+  assert.equal(presets.hidden, true);
+  assert.equal(preflight.hidden, false);
+  assert.equal(exportBody.hidden, true);
+  preflightTrigger.dispatch('click');
+  assert.equal(preflight.hidden, true);
+  assert.equal(presets.hidden, true);
+  assert.equal(exportBody.hidden, true);
   exportTrigger.dispatch('click');
-
   assert.equal(exportBody.hidden, false);
   assert.equal(exportTrigger.getAttribute('aria-expanded'), 'true');
-  assert.equal(presets.hidden, false);
-  assert.equal(panel.document.elements['preflight-preset-list'].children[0].children[0].checked, true);
+  assert.equal(presets.hidden, true);
+  assert.equal(preflight.hidden, true);
+  exportTrigger.dispatch('click');
+  assert.equal(exportBody.hidden, true);
+  assert.equal(panel.document.elements['destination-input'].value, '/preserved-destination');
+  assert.equal(required.checked, true);
+  assert.equal(normalExportSelection.checked, false);
+  assert.equal(panel.document.elements['preflight-summary'].children.length, 4);
+  assert.equal(panel.document.elements['preflight-results'].children.length, 1);
 });
 
 test('preflight renders fixed-order semantic summary rows for every status', function () {
@@ -603,6 +629,10 @@ test('preflight renders fixed-order semantic summary rows for every status', fun
     }),
     ['pass:2 Pass', 'rename:1 Rename', 'missing:1 Missing', 'duplicate:0 Duplicate']
   );
+  assert.equal(panel.document.elements['preflight-summary'].children[0].children[0].textContent, '✓');
+  assert.equal(panel.document.elements['preflight-summary'].children[0].children[0].getAttribute('aria-hidden'), 'true');
+  assert.equal(panel.document.elements['preflight-summary'].children[0].children[2].textContent, 'Pass');
+  assert.equal(panel.document.elements['preflight-summary'].children[0].children[2].getAttribute('aria-hidden'), 'true');
 });
 
 test('Run Preflight fetches Illustrator changes again before every rerun and renders matching names', function () {
@@ -704,6 +734,10 @@ test('Run Preflight reports document closure, clears stale results, and unlocks 
   panel.bridge.completeNext('listArtboards(app)');
 
   assert.equal(panel.document.elements['preflight-summary'].textContent, '');
+  assert.equal(panel.document.elements['preflight-results'].textContent, '');
+  assert.equal(panel.document.elements['create-missing-button'].disabled, true);
+  assert.equal(panel.document.elements['rename-fixable-button'].disabled, true);
+  assert.equal(panel.document.elements['export-verified-button'].disabled, true);
   assert.equal(panel.document.elements['artboard-list'].children.length, 0);
   assert.match(panel.document.elements.status.textContent, /Open an Illustrator document first/);
   assert.equal(panel.document.elements['run-preflight-button'].disabled, false);

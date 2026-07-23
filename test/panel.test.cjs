@@ -6,13 +6,18 @@ const assert = require('node:assert/strict');
 test('panel markup provides accessible independent accordion cards', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'client', 'index.html'), 'utf8');
 
-  assert.match(html, /id="presets-trigger"[\s\S]*aria-expanded="true"/);
-  assert.match(html, /id="preflight-trigger"[\s\S]*aria-expanded="true"/);
-  assert.match(html, /id="export-trigger"[\s\S]*aria-expanded="false"/);
-  assert.match(html, /aria-controls="presets-body"/);
-  assert.match(html, /aria-controls="preflight-body"/);
-  assert.match(html, /aria-controls="export-body"/);
+  assert.match(html, /<button\b(?=[^>]*\bid="presets-trigger")(?=[^>]*\baria-expanded="true")(?=[^>]*\baria-controls="presets-body")(?=[^>]*\bdata-accordion-target="presets-body")[^>]*>/);
+  assert.match(html, /<button\b(?=[^>]*\bid="preflight-trigger")(?=[^>]*\baria-expanded="true")(?=[^>]*\baria-controls="preflight-body")(?=[^>]*\bdata-accordion-target="preflight-body")[^>]*>/);
+  assert.match(html, /<button\b(?=[^>]*\bid="export-trigger")(?=[^>]*\baria-expanded="false")(?=[^>]*\baria-controls="export-body")(?=[^>]*\bdata-accordion-target="export-body")[^>]*>/);
   assert.match(html, /id="export-body"[\s\S]*hidden/);
+  assert.match(html, /<title>Artboard Size Renamer<\/title>/);
+});
+
+test('panel header keeps its decorative menu out of the interaction and accessibility trees', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'client', 'index.html'), 'utf8');
+
+  assert.match(html, /<span class="header-menu" aria-hidden="true">☰<\/span>/);
+  assert.doesNotMatch(html, /<button class="header-menu"/);
 });
 
 test('presets card separates the rename utility with a semantic divider', () => {
@@ -25,6 +30,7 @@ test('panel stylesheet defines card, accordion, and semantic status treatments',
   const css = fs.readFileSync(path.join(__dirname, '..', 'client', 'style.css'), 'utf8');
 
   assert.match(css, /\.panel-card\s*\{/);
+  assert.match(css, /\.header-menu\s*\{(?=[^}]*display:\s*grid;)(?=[^}]*box-sizing:\s*border-box;)[^}]*\}/);
   assert.match(css, /\.accordion-trigger\[aria-expanded="true"\]/);
   assert.match(css, /\.preflight-summary-row\.pass/);
   assert.match(css, /\.preflight-summary-row\.rename/);
@@ -33,6 +39,7 @@ test('panel stylesheet defines card, accordion, and semantic status treatments',
   assert.match(css, /@media\s*\(max-width:\s*320px\)/);
   assert.match(css, /grid-template-columns:\s*42px\s+minmax\(0,\s*1fr\)\s+auto/);
   assert.match(css, /\.preflight-summary-row\s*>\s*:nth-child\(2\)\s*\{[^}]*overflow-wrap:\s*anywhere/);
+  assert.match(css, /\.preflight-result\s*\{[^}]*overflow-wrap:\s*anywhere;[^}]*word-break:\s*break-word/);
   assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\.chevron\s*\{[\s\S]*?transition:\s*none/);
 });
 
