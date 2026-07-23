@@ -64,7 +64,9 @@ printf '%s\n' \
   catalog \
   client \
   host \
-  README.md > "$expected_allowlist"
+  README.md \
+  LICENSE \
+  THIRD_PARTY_NOTICES.md > "$expected_allowlist"
 
 if [ ! -f "$release_allowlist" ] || [ -L "$release_allowlist" ] || ! cmp -s "$release_allowlist" "$expected_allowlist"; then
   fail 'release-files.txt must contain exactly the approved ordered runtime paths'

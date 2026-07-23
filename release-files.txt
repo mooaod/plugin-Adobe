@@ -4,3 +4,5 @@ catalog
 client
 host
 README.md
+LICENSE
+THIRD_PARTY_NOTICES.md

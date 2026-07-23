@@ -11,8 +11,16 @@ const EXPECTED_RELEASE_PATHS = [
   'catalog',
   'client',
   'host',
-  'README.md'
+  'README.md',
+  'LICENSE',
+  'THIRD_PARTY_NOTICES.md'
 ];
+
+const RELEASE_FILE_PATHS = new Set([
+  'README.md',
+  'LICENSE',
+  'THIRD_PARTY_NOTICES.md'
+]);
 
 function writeExecutable(filePath, contents) {
   fs.writeFileSync(filePath, contents, { mode: 0o700 });
@@ -34,10 +42,14 @@ function runReleaseFixture({
 
   fs.mkdirSync(binPath);
   fs.mkdirSync(path.dirname(scriptPath));
-  EXPECTED_RELEASE_PATHS.slice(0, -1).forEach((entry) => {
-    fs.mkdirSync(path.join(fixtureRoot, entry));
+  EXPECTED_RELEASE_PATHS.forEach((entry) => {
+    const entryPath = path.join(fixtureRoot, entry);
+    if (RELEASE_FILE_PATHS.has(entry)) {
+      fs.writeFileSync(entryPath, `${entry} fixture\n`);
+    } else {
+      fs.mkdirSync(entryPath);
+    }
   });
-  fs.writeFileSync(path.join(fixtureRoot, 'README.md'), 'fixture readme\n');
   fs.writeFileSync(path.join(fixtureRoot, 'release-files.txt'), `${entries.join('\n')}\n`);
   fs.writeFileSync(certificatePath, 'fixture certificate\n');
   writeExecutable(toolPath, `#!/usr/bin/env bash
@@ -90,6 +102,41 @@ test('signed release allowlist contains only runtime files', () => {
   });
 });
 
+test('legal documents define proprietary and third-party rights', () => {
+  const license = fs.readFileSync('LICENSE', 'utf8').replace(/\s+/g, ' ');
+  const notices = fs.readFileSync('THIRD_PARTY_NOTICES.md', 'utf8').replace(/\s+/g, ' ');
+
+  assert.match(license, /MOO_AI PROPRIETARY SOFTWARE LICENSE/);
+  assert.match(license, /Copyright \(c\) 2026 Moo_Ai/);
+  assert.match(license, /personal or internal business use/);
+  assert.match(license, /Moo_Ai gives prior written permission/);
+  assert.match(license, /to the extent permitted by applicable law/);
+  assert.match(license, /Third-Party Materials/);
+  assert.match(license, /terminates automatically/);
+  assert.match(license, /AS IS/);
+  assert.match(license, /English version controls/);
+  assert.match(license, /คำแปลภาษาไทย/);
+
+  assert.match(notices, /client\/CSInterface\.js/);
+  assert.match(notices, /CSInterface - v7\.0\.0/);
+  assert.match(notices, /Copyright 2013 Adobe Systems Incorporated/);
+  assert.match(notices, /Adobe CEP Resources/);
+  assert.match(notices, /Adobe Software Development Kit License/);
+  assert.match(notices, /does not replace or modify Adobe's terms/);
+});
+
+test('README disclaims affiliation and identifies trademark owners bilingually', () => {
+  const readme = fs.readFileSync('README.md', 'utf8').replace(/\s+/g, ' ');
+
+  assert.match(readme, /not affiliated with, sponsored by, or endorsed by Adobe, Meta, or Google/);
+  assert.match(readme, /ไม่เกี่ยวข้อง ไม่ได้รับการสนับสนุน และไม่ได้รับการรับรองโดย Adobe, Meta หรือ Google/);
+  assert.match(readme, /Adobe and Adobe Illustrator/);
+  assert.match(readme, /Instagram and Facebook/);
+  assert.match(readme, /YouTube and Google/);
+  assert.match(readme, /All trademarks are the property of their respective owners/);
+  assert.match(readme, /เครื่องหมายการค้าทั้งหมดเป็นทรัพย์สินของ\s*เจ้าของแต่ละราย/);
+});
+
 test('signed release script keeps secrets external and verifies before publishing', () => {
   const script = fs.readFileSync('scripts/build-signed-zxp.sh', 'utf8');
   const verifyAt = script.indexOf('-verify');
@@ -101,6 +148,8 @@ test('signed release script keeps secrets external and verifies before publishin
   assert.match(script, /\/Users\/aibd\/Library\/Application Support\/Moo_Ai\/Signing\/ArtboardSizeRenamer\.p12/);
   assert.match(script, /timestamp_url="http:\/\/timestamp\.digicert\.com"/);
   assert.match(script, /-tsa "\$timestamp_url"/);
+  assert.match(script, /LICENSE/);
+  assert.match(script, /THIRD_PARTY_NOTICES\.md/);
   ['.git', '.DS_Store', 'node_modules', 'test', 'docs', 'releases', '*.p12', '*password*', 'zxpsigncmd'].forEach((forbidden) => {
     assert.match(script, new RegExp(forbidden.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
   });

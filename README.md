@@ -70,6 +70,33 @@ CEP debug mode, and restart Illustrator. Open **Window → Extensions → Artboa
 Size Renamer** and verify square, landscape, portrait, existing-name replacement,
 and no-document cases.
 
+## License, trademarks, and no affiliation / สิทธิ์ เครื่องหมายการค้า และความไม่เกี่ยวข้อง
+
+Original Moo_Ai code and assets are proprietary and licensed under
+[`LICENSE`](LICENSE). Adobe `client/CSInterface.js` is governed separately as
+described in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+Artboard Size Renamer is an independent Moo_Ai product and is not affiliated
+with, sponsored by, or endorsed by Adobe, Meta, or Google. Adobe and Adobe
+Illustrator are trademarks or registered trademarks of Adobe in the United
+States and/or other countries. Instagram and Facebook are trademarks of Meta
+Platforms, Inc. YouTube and Google are trademarks of Google LLC. Product names
+are used only to describe compatibility and preset destinations. All trademarks
+are the property of their respective owners.
+
+โค้ดและทรัพย์สินต้นฉบับของ Moo_Ai เป็น proprietary software และอยู่ภายใต้
+[`LICENSE`](LICENSE) ส่วน Adobe `client/CSInterface.js` อยู่ภายใต้ข้อกำหนด
+แยกต่างหากตาม [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
+
+Artboard Size Renamer เป็นผลิตภัณฑ์อิสระของ Moo_Ai และไม่เกี่ยวข้อง
+ไม่ได้รับการสนับสนุน และไม่ได้รับการรับรองโดย Adobe, Meta หรือ Google
+Adobe และ Adobe Illustrator เป็นเครื่องหมายการค้าหรือเครื่องหมายการค้า
+จดทะเบียนของ Adobe ในสหรัฐอเมริกาและ/หรือประเทศอื่น Instagram และ Facebook
+เป็นเครื่องหมายการค้าของ Meta Platforms, Inc. YouTube และ Google เป็น
+เครื่องหมายการค้าของ Google LLC ชื่อผลิตภัณฑ์ใช้เพื่ออธิบายความเข้ากันได้
+และปลายทางของพรีเซ็ตเท่านั้น เครื่องหมายการค้าทั้งหมดเป็นทรัพย์สินของ
+เจ้าของแต่ละราย
+
 ## Signed ZXP installation / การติดตั้ง Signed ZXP
 
 The signed release is `ArtboardSizeRenamer-v1.0.0-signed.zxp`. Install it with a ZXP-capable Adobe extension installer, fully quit Illustrator, then reopen Illustrator and choose **Window → Extensions → Artboard Size Renamer**. Verify the downloaded file against the accompanying `.sha256` file before installation.
