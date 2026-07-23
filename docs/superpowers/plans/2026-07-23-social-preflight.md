@@ -250,6 +250,7 @@ test('runs preflight, creates only missing presets, renames only fixable artboar
   assert.match(panel.document.elements['preflight-summary'].textContent, /1 Pass.*1 Rename.*1 Missing/);
   panel.document.elements['create-missing-button'].dispatch('click');
   assert.match(panel.bridge.calls.find(function (call) { return call.indexOf('createPresetArtboards(app, ') === 0; }), /instagram-story/);
+  panel.document.elements['run-preflight-button'].dispatch('click');
   panel.document.elements['rename-fixable-button'].dispatch('click');
   assert.match(panel.bridge.calls.find(function (call) { return call.indexOf('renameArtboards\(app, ') === 0; }), /instagram-portrait_1080x1350 px/);
   panel.document.elements['run-preflight-button'].dispatch('click');
