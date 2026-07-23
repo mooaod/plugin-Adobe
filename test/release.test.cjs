@@ -125,16 +125,15 @@ test('legal documents define proprietary and third-party rights', () => {
   assert.match(notices, /does not replace or modify Adobe's terms/);
 });
 
-test('README disclaims affiliation and identifies trademark owners bilingually', () => {
+test('README is English-only and disclaims affiliation and identifies trademark owners', () => {
   const readme = fs.readFileSync('README.md', 'utf8').replace(/\s+/g, ' ');
 
   assert.match(readme, /not affiliated with, sponsored by, or endorsed by Adobe, Meta, or Google/);
-  assert.match(readme, /ไม่เกี่ยวข้อง ไม่ได้รับการสนับสนุน และไม่ได้รับการรับรองโดย Adobe, Meta หรือ Google/);
   assert.match(readme, /Adobe and Adobe Illustrator/);
   assert.match(readme, /Instagram and Facebook/);
   assert.match(readme, /YouTube and Google/);
   assert.match(readme, /All trademarks are the property of their respective owners/);
-  assert.match(readme, /เครื่องหมายการค้าทั้งหมดเป็นทรัพย์สินของ\s*เจ้าของแต่ละราย/);
+  assert.doesNotMatch(readme, /[\u0E00-\u0E7F]/);
 });
 
 test('signed release script keeps secrets external and verifies before publishing', () => {
@@ -250,5 +249,4 @@ test('release artifacts are ignored and signed installation is documented', () =
 
   assert.match(gitignore, /^\/releases\/$/m);
   assert.match(readme, /Signed ZXP installation/);
-  assert.match(readme, /การติดตั้ง Signed ZXP/);
 });
