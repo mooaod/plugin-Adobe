@@ -31,6 +31,9 @@ test('panel stylesheet defines card, accordion, and semantic status treatments',
   assert.match(css, /\.preflight-summary-row\.missing/);
   assert.match(css, /\.preflight-summary-row\.duplicate/);
   assert.match(css, /@media\s*\(max-width:\s*320px\)/);
+  assert.match(css, /grid-template-columns:\s*42px\s+minmax\(0,\s*1fr\)\s+auto/);
+  assert.match(css, /\.preflight-summary-row\s*>\s*:nth-child\(2\)\s*\{[^}]*overflow-wrap:\s*anywhere/);
+  assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\.chevron\s*\{[\s\S]*?transition:\s*none/);
 });
 
 test('panel controller invokes the host rename operation and reports its result', () => {

@@ -112,6 +112,10 @@ h3 { margin: 0 0 8px; font-size: 15px; }
 
 .accordion-trigger[aria-expanded="true"] .chevron { transform: rotate(225deg); }
 
+@media (prefers-reduced-motion: reduce) {
+  .chevron { transition: none; }
+}
+
 .accordion-body { padding: 0 22px 22px; }
 .accordion-body[hidden] { display: none; }
 .card-helper { margin: 8px 0 12px; color: #c8c8c8; }
@@ -172,13 +176,15 @@ h3 { margin: 0 0 8px; font-size: 15px; }
 
 .preflight-summary-row {
   display: grid;
-  grid-template-columns: 42px 1fr auto;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   padding: 14px 8px;
   border-top: 1px solid #505050;
   font-size: 18px;
 }
+
+.preflight-summary-row > :nth-child(2) { min-width: 0; overflow-wrap: anywhere; }
 
 .preflight-status-icon {
   display: grid;
