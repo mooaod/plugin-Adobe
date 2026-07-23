@@ -21,6 +21,18 @@ test('presets card separates the rename utility with a semantic divider', () => 
   assert.match(html, /<\/div>\s*<hr class="utility-divider">\s*<div class="utility"><button id="rename-button"/);
 });
 
+test('panel stylesheet defines card, accordion, and semantic status treatments', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'client', 'style.css'), 'utf8');
+
+  assert.match(css, /\.panel-card\s*\{/);
+  assert.match(css, /\.accordion-trigger\[aria-expanded="true"\]/);
+  assert.match(css, /\.preflight-summary-row\.pass/);
+  assert.match(css, /\.preflight-summary-row\.rename/);
+  assert.match(css, /\.preflight-summary-row\.missing/);
+  assert.match(css, /\.preflight-summary-row\.duplicate/);
+  assert.match(css, /@media\s*\(max-width:\s*320px\)/);
+});
+
 test('panel controller invokes the host rename operation and reports its result', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'client', 'index.js'), 'utf8');
 
