@@ -237,6 +237,11 @@ test('runs preflight, creates only missing presets, renames only fixable artboar
       ] },
       { ok: true, artboards: [
         { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
+        { index: 1, name: 'Portrait draft', width: 1080, height: 1350 },
+        { index: 2, name: 'instagram-story_1080x1920 px', width: 1080, height: 1920 }
+      ] },
+      { ok: true, artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
         { index: 1, name: 'instagram-portrait_1080x1350 px', width: 1080, height: 1350 },
         { index: 2, name: 'instagram-story_1080x1920 px', width: 1080, height: 1920 }
       ] }
