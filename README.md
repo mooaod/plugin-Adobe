@@ -69,3 +69,11 @@ Copy this extension directory to
 CEP debug mode, and restart Illustrator. Open **Window → Extensions → Artboard
 Size Renamer** and verify square, landscape, portrait, existing-name replacement,
 and no-document cases.
+
+## Signed ZXP installation / การติดตั้ง Signed ZXP
+
+The signed release is `ArtboardSizeRenamer-v1.0.0-signed.zxp`. Install it with a ZXP-capable Adobe extension installer, fully quit Illustrator, then reopen Illustrator and choose **Window → Extensions → Artboard Size Renamer**. Verify the downloaded file against the accompanying `.sha256` file before installation.
+
+ไฟล์สำหรับแจกคือ `ArtboardSizeRenamer-v1.0.0-signed.zxp` ให้ติดตั้งด้วยเครื่องมือติดตั้ง Adobe extension ที่รองรับ ZXP จากนั้นปิด Illustrator ให้หมด เปิดใหม่ แล้วไปที่ **Window → Extensions → Artboard Size Renamer** ควรตรวจสอบไฟล์ด้วย `.sha256` ที่ให้มาด้วยก่อนติดตั้ง
+
+This direct-distribution build uses a self-signed certificate from `Moo_Ai`; it is not an Adobe Marketplace listing. / รุ่นแจกโดยตรงนี้ใช้ self-signed certificate ของ `Moo_Ai` และยังไม่ใช่รายการบน Adobe Marketplace
