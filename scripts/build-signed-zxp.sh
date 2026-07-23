@@ -9,8 +9,11 @@ certificate_path="/Users/aibd/Library/Application Support/Moo_Ai/Signing/Artboar
 keychain_service="Moo_Ai Artboard Size Renamer Signing"
 keychain_account="aibd"
 timestamp_url="http://timestamp.digicert.com"
-output_zxp="$project_root/releases/ArtboardSizeRenamer-v1.0.0-signed.zxp"
-checksum_path="$output_zxp.sha256"
+output_dir="$project_root/releases"
+output_name="ArtboardSizeRenamer-v1.0.0-signed.zxp"
+checksum_name="$output_name.sha256"
+output_zxp="$output_dir/$output_name"
+checksum_path="$output_dir/$checksum_name"
 work_root=""
 signing_password=""
 
@@ -126,8 +129,11 @@ run_zxp_signer -sign "$staging_root" "$temporary_zxp" "$certificate_path" "$sign
 unset signing_password
 run_zxp_signer -verify "$temporary_zxp" -certinfo
 
-mkdir -p "$project_root/releases"
+mkdir -p "$output_dir"
 mv -- "$temporary_zxp" "$output_zxp"
-shasum -a 256 "$output_zxp" > "$checksum_path"
-shasum -a 256 -c "$checksum_path"
+(
+  cd "$output_dir"
+  shasum -a 256 "$output_name" > "$checksum_name"
+  shasum -a 256 -c "$checksum_name"
+)
 printf 'Signed ZXP created: %s\n' "$output_zxp"

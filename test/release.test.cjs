@@ -172,6 +172,29 @@ test('release build does not publish when verification fails', () => {
   }
 });
 
+test('successful release writes a portable basename-only checksum', () => {
+  const { fixtureRoot, result } = runReleaseFixture({ securityExit: 0 });
+  const checksumPath = path.join(
+    fixtureRoot,
+    'releases',
+    'ArtboardSizeRenamer-v1.0.0-signed.zxp.sha256'
+  );
+
+  try {
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(
+      fs.existsSync(path.join(fixtureRoot, 'releases', 'ArtboardSizeRenamer-v1.0.0-signed.zxp')),
+      true
+    );
+    assert.match(
+      fs.readFileSync(checksumPath, 'utf8'),
+      /^[a-f0-9]{64}  ArtboardSizeRenamer-v1\.0\.0-signed\.zxp\n$/
+    );
+  } finally {
+    fs.rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
 test('release artifacts are ignored and signed installation is documented', () => {
   const gitignore = fs.readFileSync('.gitignore', 'utf8');
   const readme = fs.readFileSync('README.md', 'utf8');
