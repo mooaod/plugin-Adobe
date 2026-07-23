@@ -20,6 +20,13 @@
   var customPresetWidth = document.getElementById('custom-preset-width');
   var customPresetHeight = document.getElementById('custom-preset-height');
   var addCustomPresetButton = document.getElementById('add-custom-preset-button');
+  var preflightPresetList = document.getElementById('preflight-preset-list');
+  var runPreflightButton = document.getElementById('run-preflight-button');
+  var preflightSummary = document.getElementById('preflight-summary');
+  var preflightResults = document.getElementById('preflight-results');
+  var createMissingButton = document.getElementById('create-missing-button');
+  var renameFixableButton = document.getElementById('rename-fixable-button');
+  var exportVerifiedButton = document.getElementById('export-verified-button');
   var status = document.getElementById('status');
   var csInterface = new CSInterface();
   var activeCatalog = null;
@@ -27,7 +34,9 @@
   var catalogSource = 'bundled';
   var artboards = [];
   var presetCheckboxes = [];
+  var preflightCheckboxes = [];
   var artboardCheckboxes = [];
+  var preflightReport = null;
   var hostReady = false;
   var hostLoadError = '';
   var cachedState = readCache();
@@ -178,19 +187,101 @@
     createButton.disabled = !hostReady || selectedPresets().length === 0;
   }
 
+  function selectedPreflightPresets() {
+    var selected = [];
+    var i;
+    if (!activeCatalog) {
+      return selected;
+    }
+    for (i = 0; i < preflightCheckboxes.length; i += 1) {
+      if (preflightCheckboxes[i].checked) {
+        selected.push(activeCatalog.presets[
+          Number(preflightCheckboxes[i].dataset.presetIndex)
+        ]);
+      }
+    }
+    return selected;
+  }
+
+  function preflightCanExport(report) {
+    return report && report.summary.missing === 0 && report.summary.duplicate === 0 &&
+      report.summary.pass > 0;
+  }
+
+  function fixableRenameChanges(report) {
+    return report.results.filter(function (result) { return result.status === 'rename'; })
+      .map(function (result) {
+        return { index: result.artboards[0].index, name: result.canonicalName };
+      });
+  }
+
+  function updatePreflightState() {
+    runPreflightButton.disabled = !hostReady || selectedPreflightPresets().length === 0;
+    createMissingButton.disabled = !hostReady || !preflightReport ||
+      preflightReport.summary.missing === 0;
+    renameFixableButton.disabled = !hostReady || !preflightReport ||
+      preflightReport.summary.rename === 0;
+    exportVerifiedButton.disabled = !hostReady || !preflightCanExport(preflightReport) ||
+      !destinationInput.value.trim();
+  }
+
+  function clearPreflightReport() {
+    preflightReport = null;
+    preflightSummary.textContent = '';
+    preflightSummary.className = 'preflight-summary';
+    clearElement(preflightResults);
+    updatePreflightState();
+  }
+
+  function renderPreflightReport(report) {
+    var i;
+    var result;
+    var item;
+    preflightSummary.textContent = report.summary.pass + ' Pass · ' +
+      report.summary.rename + ' Rename · ' +
+      report.summary.missing + ' Missing · ' +
+      report.summary.duplicate + ' Duplicate';
+    preflightSummary.className = 'preflight-summary';
+    clearElement(preflightResults);
+    for (i = 0; i < report.results.length; i += 1) {
+      result = report.results[i];
+      item = document.createElement('div');
+      item.className = 'preflight-result ' + result.status;
+      item.textContent = result.preset.label + ' — ' +
+        result.status.charAt(0).toUpperCase() + result.status.slice(1);
+      preflightResults.appendChild(item);
+    }
+  }
+
+  function runPreflight() {
+    var requiredPresets = selectedPreflightPresets();
+    if (!hostReady || !requiredPresets.length) {
+      updatePreflightState();
+      return;
+    }
+    preflightReport = buildPreflightReport(requiredPresets, artboards);
+    renderPreflightReport(preflightReport);
+    updatePreflightState();
+  }
+
   function renderCatalog(catalog, source) {
     var i;
     activeBaseCatalog = catalog;
     activeCatalog = mergeCatalogWithCustom(catalog, customPresets);
     catalogSource = source;
     presetCheckboxes = [];
+    preflightCheckboxes = [];
     clearElement(presetList);
+    clearElement(preflightPresetList);
 
     for (i = 0; i < activeCatalog.presets.length; i += 1) {
       var preset = activeCatalog.presets[i];
       var label = document.createElement('label');
       var checkbox = document.createElement('input');
       var description = document.createElement('span');
+      var preflightLabel = document.createElement('label');
+      var preflightCheckbox = document.createElement('input');
+      var preflightDescription = document.createElement('span');
       label.className = 'check-item';
       checkbox.type = 'checkbox';
       checkbox.checked = false;
@@ -201,8 +292,20 @@
       label.appendChild(description);
       presetList.appendChild(label);
       presetCheckboxes.push(checkbox);
+      preflightLabel.className = 'check-item';
+      preflightCheckbox.type = 'checkbox';
+      preflightCheckbox.checked = false;
+      preflightCheckbox.dataset.presetIndex = String(i);
+      preflightCheckbox.addEventListener('change', clearPreflightReport);
+      preflightDescription.textContent = preset.label + ' — ' +
+        preset.width + ' × ' + preset.height + ' px';
+      preflightLabel.appendChild(preflightCheckbox);
+      preflightLabel.appendChild(preflightDescription);
+      preflightPresetList.appendChild(preflightLabel);
+      preflightCheckboxes.push(preflightCheckbox);
     }
     updateCreateState();
+    clearPreflightReport();
     catalogInfo.textContent = catalogDescription();
   }
 
@@ -290,6 +393,7 @@
   function refreshArtboards() {
     csInterface.evalScript('listArtboards(app)', function (rawResult) {
       var result = parseHostResult(rawResult);
+      clearPreflightReport();
       if (result.ok) {
         renderArtboards(result.artboards);
       } else {
@@ -332,6 +436,7 @@
           hostLoadError = result.error;
           updateCreateState();
           updateExportState();
+          updatePreflightState();
           setStatus(hostFailureMessage());
           return;
         }
@@ -339,12 +444,14 @@
         hostLoadError = '';
         updateCreateState();
         updateExportState();
+        updatePreflightState();
         enableSupportedExportFormats(onReady);
       });
     } catch (error) {
       hostLoadError = error.message;
       updateCreateState();
       updateExportState();
+      updatePreflightState();
       setStatus(hostFailureMessage());
     }
   }
@@ -459,6 +566,7 @@
 
   button.addEventListener('click', function () {
     button.disabled = true;
+    clearPreflightReport();
     setStatus('Renaming…');
 
     try {
@@ -469,8 +577,10 @@
             ? 'Renamed ' + result.renamed + ' artboard(s).'
             : result.error);
           button.disabled = false;
+          refreshArtboards();
         } catch (error) {
           restore('Could not read Illustrator’s response. Please try again.');
+          refreshArtboards();
         }
       });
     } catch (error) {
@@ -490,12 +600,14 @@
       return;
     }
     createButton.disabled = true;
+    clearPreflightReport();
     setStatus('Creating selected presets…');
     csInterface.evalScript('createPresetArtboards(app, ' + JSON.stringify(presets) + ')', function (rawResult) {
       var result = parseHostResult(rawResult);
       updateCreateState();
       if (!result.ok) {
         setStatus(result.error);
+        refreshArtboards();
         return;
       }
       setStatus('Created ' + result.created.length + ' preset artboard(s).');
@@ -541,12 +653,70 @@
     setStatus('Added custom preset ' + candidate.label + '.');
   });
 
+  runPreflightButton.addEventListener('click', runPreflight);
+
+  createMissingButton.addEventListener('click', function () {
+    var missing = [];
+    var i;
+    if (!hostReady || !preflightReport) {
+      updatePreflightState();
+      return;
+    }
+    for (i = 0; i < preflightReport.results.length; i += 1) {
+      if (preflightReport.results[i].status === 'missing') {
+        missing.push(preflightReport.results[i].preset);
+      }
+    }
+    if (!missing.length) {
+      updatePreflightState();
+      return;
+    }
+    clearPreflightReport();
+    setStatus('Creating missing preset artboards…');
+    csInterface.evalScript(
+      'createPresetArtboards(app, ' + JSON.stringify(missing) + ')',
+      function (rawResult) {
+        var result = parseHostResult(rawResult);
+        setStatus(result.ok
+          ? 'Created ' + result.created.length + ' missing preset artboard(s).'
+          : result.error);
+        refreshArtboards();
+      }
+    );
+  });
+
+  renameFixableButton.addEventListener('click', function () {
+    var changes;
+    if (!hostReady || !preflightReport) {
+      updatePreflightState();
+      return;
+    }
+    changes = fixableRenameChanges(preflightReport);
+    if (!changes.length) {
+      updatePreflightState();
+      return;
+    }
+    clearPreflightReport();
+    setStatus('Renaming fixable artboards…');
+    csInterface.evalScript(
+      'renameArtboards(app, ' + JSON.stringify(changes) + ')',
+      function (rawResult) {
+        var result = parseHostResult(rawResult);
+        setStatus(result.ok
+          ? 'Renamed ' + result.renamed.length + ' fixable artboard(s).'
+          : result.error);
+        refreshArtboards();
+      }
+    );
+  });
+
   function completeExport(exportRequest, rawResult) {
     var result = parseHostResult(rawResult);
     var confirmationMessage;
     if (result.ok) {
       setStatus('Exported ' + result.exported.length + ' artboard(s).');
       updateExportState();
+      updatePreflightState();
       return;
     }
     if (result.code === 'OUTPUT_EXISTS' && result.conflicts &&
@@ -561,10 +731,12 @@
       }
       setStatus('Export cancelled; no existing files were overwritten.');
       updateExportState();
+      updatePreflightState();
       return;
     }
     setStatus(result.error);
     updateExportState();
+    updatePreflightState();
   }
 
   function sendExportRequest(exportRequest) {
@@ -603,11 +775,39 @@
     sendExportRequest(exportRequest);
   });
 
+  exportVerifiedButton.addEventListener('click', function () {
+    var indexes = [];
+    var i;
+    if (!hostReady || !preflightCanExport(preflightReport) ||
+        !destinationInput.value.trim()) {
+      updatePreflightState();
+      return;
+    }
+    for (i = 0; i < preflightReport.results.length; i += 1) {
+      if (preflightReport.results[i].status === 'pass') {
+        indexes.push(preflightReport.results[i].artboards[0].index);
+      }
+    }
+    exportVerifiedButton.disabled = true;
+    setStatus('Exporting verified artboards…');
+    sendExportRequest({
+      artboardIndexes: indexes,
+      destination: destinationInput.value.trim(),
+      format: formatSelect.value
+    });
+  });
+
   updateButton.addEventListener('click', function () {
     checkRemoteCatalog(false);
   });
-  formatSelect.addEventListener('change', updateExportState);
-  destinationInput.addEventListener('input', updateExportState);
+  formatSelect.addEventListener('change', function () {
+    updateExportState();
+    updatePreflightState();
+  });
+  destinationInput.addEventListener('input', function () {
+    updateExportState();
+    updatePreflightState();
+  });
 
   loadBundledCatalog();
   loadHostWorkflow(refreshArtboards);

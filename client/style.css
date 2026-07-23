@@ -33,5 +33,15 @@ input { width: 100%; padding: 7px 8px; border: 1px solid #606060; border-radius:
 .dimension-fields { display: flex; gap: 8px; }
 .dimension-fields > div { flex: 1; }
 .custom-preset-form button { margin-top: 10px; }
+.preflight-summary { min-height: 1.4em; margin: 10px 0 6px; color: #d0d0d0; }
+.preflight-result { margin: 4px 0; padding: 5px 7px; border-left: 3px solid #777; background: #303030; }
+.preflight-result.pass { border-color: #65b96e; }
+.preflight-result.rename { border-color: #78a9ff; }
+.preflight-result.missing { border-color: #ffb95c; }
+.preflight-result.duplicate { border-color: #ef6c78; }
+#preflight-results { margin-bottom: 10px; }
+#create-missing-button,
+#rename-fixable-button,
+#export-verified-button { margin: 4px 4px 0 0; }
 .utility { margin-top: 14px; }
 #status { min-height: 2.8em; margin: 14px 0 0; color: #d0d0d0; }

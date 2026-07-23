@@ -32,6 +32,20 @@ function catalog(version) {
   };
 }
 
+function fourPresetCatalog() {
+  return {
+    schemaVersion: 1,
+    catalogVersion: '1.0.0',
+    updatedAt: '2026-07-17',
+    presets: [
+      { id: 'instagram-feed', label: 'Instagram Feed', width: 1080, height: 1080 },
+      { id: 'instagram-portrait', label: 'Instagram Portrait', width: 1080, height: 1350 },
+      { id: 'instagram-story', label: 'Instagram Story', width: 1080, height: 1920 },
+      { id: 'facebook-feed', label: 'Facebook Feed', width: 1200, height: 630 }
+    ]
+  };
+}
+
 class FakeElement {
   constructor(id, tagName) {
     this.id = id || '';
@@ -81,7 +95,10 @@ function fakeDocument() {
     'update-presets-button', 'format-select', 'artboard-list',
     'destination-input', 'export-button', 'collision-warning', 'status',
     'custom-preset-id', 'custom-preset-label', 'custom-preset-width',
-    'custom-preset-height', 'add-custom-preset-button'
+    'custom-preset-height', 'add-custom-preset-button',
+    'preflight-preset-list', 'run-preflight-button', 'preflight-summary',
+    'preflight-results', 'create-missing-button', 'rename-fixable-button',
+    'export-verified-button'
   ];
   const elements = {};
   ids.forEach(function (id) {
@@ -100,6 +117,12 @@ function fakeDocument() {
 function runPanel(options) {
   options = options || {};
   const document = fakeDocument();
+  const artboardResults = options.artboardResults
+    ? options.artboardResults.slice()
+    : null;
+  const renameResults = options.renameResults
+    ? options.renameResults.slice()
+    : null;
   const bridge = {
     calls: [],
     evalScript: function (script, callback) {
@@ -112,10 +135,17 @@ function runPanel(options) {
           formats: { png: true, jpg: true, webp: true }
         }));
       } else if (script === 'listArtboards(app)') {
-        callback(JSON.stringify(options.artboardResult || {
+        const artboardResult = artboardResults && artboardResults.length
+          ? (artboardResults.length > 1 ? artboardResults.shift() : artboardResults[0])
+          : options.artboardResult;
+        callback(JSON.stringify(artboardResult || {
           ok: true,
           artboards: [{ index: 0, name: 'Board', width: 100, height: 100 }]
         }));
+      } else if (script.indexOf('renameArtboards(app, ') === 0) {
+        callback(JSON.stringify(renameResults && renameResults.length
+          ? (renameResults.length > 1 ? renameResults.shift() : renameResults[0])
+          : { ok: true, renamed: [] }));
       } else if (script.indexOf('exportArtboards(app, ') === 0 && options.exportResults) {
         callback(JSON.stringify(options.exportResults.shift()));
       } else if (script.indexOf('createPresetArtboards(app, ') === 0 && options.createRawResult) {
@@ -428,6 +458,188 @@ test('leaves every preset unselected when the panel opens', function () {
 
   assert.equal(presetCheckbox.checked, false);
   assert.equal(panel.document.elements['create-presets-button'].disabled, true);
+});
+
+test('starts required delivery presets unchecked and disables preflight actions', function () {
+  const panel = runPanel({ cacheState: { catalog: catalog(), source: 'cache', lastSuccessfulCheck: new Date().toISOString() } });
+  assert.equal(panel.document.elements['preflight-preset-list'].children[0].children[0].checked, false);
+  assert.equal(panel.document.elements['run-preflight-button'].disabled, true);
+  assert.equal(panel.document.elements['export-verified-button'].disabled, true);
+});
+
+test('runs preflight, creates only missing presets, renames only fixable artboards, and exports pass results', function () {
+  const panel = runPanel({
+    cacheState: { catalog: fourPresetCatalog(), source: 'cache', lastSuccessfulCheck: new Date().toISOString() },
+    artboardResults: [
+      { ok: true, artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
+        { index: 1, name: 'Portrait draft', width: 1080, height: 1350 }
+      ] },
+      { ok: true, artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
+        { index: 1, name: 'Portrait draft', width: 1080, height: 1350 },
+        { index: 2, name: 'instagram-story_1080x1920 px', width: 1080, height: 1920 }
+      ] },
+      { ok: true, artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
+        { index: 1, name: 'instagram-portrait_1080x1350 px', width: 1080, height: 1350 },
+        { index: 2, name: 'instagram-story_1080x1920 px', width: 1080, height: 1920 }
+      ] }
+    ]
+  });
+  const required = panel.document.elements['preflight-preset-list'].children;
+  required[0].children[0].checked = true; required[0].children[0].dispatch('change');
+  required[1].children[0].checked = true; required[1].children[0].dispatch('change');
+  required[2].children[0].checked = true; required[2].children[0].dispatch('change');
+  panel.document.elements['run-preflight-button'].dispatch('click');
+  assert.match(panel.document.elements['preflight-summary'].textContent, /1 Pass.*1 Rename.*1 Missing/);
+  panel.document.elements['create-missing-button'].dispatch('click');
+  assert.match(panel.bridge.calls.find(function (call) { return call.indexOf('createPresetArtboards(app, ') === 0; }), /instagram-story/);
+  panel.document.elements['run-preflight-button'].dispatch('click');
+  panel.document.elements['rename-fixable-button'].dispatch('click');
+  assert.match(panel.bridge.calls.find(function (call) { return call.indexOf('renameArtboards\(app, ') === 0; }), /instagram-portrait_1080x1350 px/);
+  panel.document.elements['run-preflight-button'].dispatch('click');
+  panel.document.elements['export-verified-button'].dispatch('click');
+  assert.match(panel.bridge.calls.find(function (call) { return call.indexOf('exportArtboards(app, ') === 0; }), /"artboardIndexes":\[0,1,2\]/);
+});
+
+test('clears a preflight report when delivery requirements change', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: fourPresetCatalog(), source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    },
+    artboardResult: {
+      ok: true,
+      artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 }
+      ]
+    }
+  });
+  const required = panel.document.elements['preflight-preset-list'].children;
+
+  required[0].children[0].checked = true;
+  required[0].children[0].dispatch('change');
+  panel.document.elements['run-preflight-button'].dispatch('click');
+  assert.match(panel.document.elements['preflight-summary'].textContent, /1 Pass/);
+
+  required[1].children[0].checked = true;
+  required[1].children[0].dispatch('change');
+  assert.equal(panel.document.elements['preflight-summary'].textContent, '');
+  assert.equal(panel.document.elements['export-verified-button'].disabled, true);
+});
+
+test('never renames duplicates or exports a report containing duplicates', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    },
+    artboardResult: {
+      ok: true,
+      artboards: [
+        { index: 0, name: 'Feed A', width: 1080, height: 1080 },
+        { index: 1, name: 'Feed B', width: 1080, height: 1080 }
+      ]
+    }
+  });
+  const required = panel.document.elements['preflight-preset-list'].children;
+
+  required[0].children[0].checked = true;
+  required[0].children[0].dispatch('change');
+  panel.document.elements['run-preflight-button'].dispatch('click');
+
+  assert.match(panel.document.elements['preflight-summary'].textContent, /1 Duplicate/);
+  assert.equal(panel.document.elements['rename-fixable-button'].disabled, true);
+  assert.equal(panel.document.elements['export-verified-button'].disabled, true);
+  panel.document.elements['rename-fixable-button'].dispatch('click');
+  panel.document.elements['export-verified-button'].dispatch('click');
+  assert.equal(panel.bridge.calls.some(function (call) {
+    return call.indexOf('renameArtboards(app, ') === 0;
+  }), false);
+  assert.equal(panel.bridge.calls.some(function (call) {
+    return call.indexOf('exportArtboards(app, ') === 0;
+  }), false);
+});
+
+test('restores verified export availability after a successful export', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    },
+    artboardResult: {
+      ok: true,
+      artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 }
+      ]
+    }
+  });
+  const required = panel.document.elements['preflight-preset-list'].children;
+
+  required[0].children[0].checked = true;
+  required[0].children[0].dispatch('change');
+  panel.document.elements['run-preflight-button'].dispatch('click');
+  panel.document.elements['export-verified-button'].dispatch('click');
+
+  assert.equal(panel.document.elements['export-verified-button'].disabled, false);
+});
+
+test('clears preflight before existing preset creation even when the host response fails', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    },
+    artboardResult: {
+      ok: true,
+      artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 }
+      ]
+    },
+    createRawResult: 'EvalScript error.'
+  });
+  const required = panel.document.elements['preflight-preset-list'].children;
+  const createPreset = panel.document.elements['preset-list'].children;
+
+  required[0].children[0].checked = true;
+  required[0].children[0].dispatch('change');
+  panel.document.elements['run-preflight-button'].dispatch('click');
+  createPreset[0].children[0].checked = true;
+  createPreset[0].children[0].dispatch('change');
+  panel.document.elements['create-presets-button'].dispatch('click');
+
+  assert.equal(panel.document.elements['preflight-summary'].textContent, '');
+  assert.equal(panel.document.elements['export-verified-button'].disabled, true);
+});
+
+test('clears preflight and refreshes artboards after the existing rename utility', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    },
+    artboardResult: {
+      ok: true,
+      artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 }
+      ]
+    }
+  });
+  const required = panel.document.elements['preflight-preset-list'].children;
+  const initialListCalls = panel.bridge.calls.filter(function (call) {
+    return call === 'listArtboards(app)';
+  }).length;
+
+  required[0].children[0].checked = true;
+  required[0].children[0].dispatch('change');
+  panel.document.elements['run-preflight-button'].dispatch('click');
+  panel.document.elements['rename-button'].dispatch('click');
+
+  assert.equal(panel.document.elements['preflight-summary'].textContent, '');
+  assert.equal(panel.bridge.calls.filter(function (call) {
+    return call === 'listArtboards(app)';
+  }).length, initialListCalls + 1);
 });
 
 test('creates checked presets and exports checked artboards with validated JSON requests', function () {
