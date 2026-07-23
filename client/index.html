@@ -7,70 +7,76 @@
     <link rel="stylesheet" href="style.css">
   </head>
   <body>
-    <main>
-      <header>
-        <h1>Social Artboard Presets</h1>
-        <button id="update-presets-button" class="secondary" type="button">Check Preset Updates</button>
+    <main class="panel-shell">
+      <header class="panel-header">
+        <h1>Artboard Size Renamer</h1>
+        <button class="header-menu" type="button" aria-label="Panel menu" disabled>☰</button>
       </header>
 
-      <section aria-labelledby="preset-heading">
-        <div class="section-heading">
-          <h2 id="preset-heading">Presets</h2>
-          <span id="catalog-info" class="meta">Loading presets…</span>
-        </div>
-        <div id="preset-list" class="checklist"></div>
-        <button id="create-presets-button" type="button" disabled>Create Selected Presets</button>
-        <p id="status" role="status" aria-live="polite">Ready</p>
-
-        <div class="custom-preset-form" aria-labelledby="custom-preset-heading">
-          <h3 id="custom-preset-heading">Add custom preset</h3>
-          <label for="custom-preset-id">Unique ID</label>
-          <input id="custom-preset-id" type="text" placeholder="my-banner">
-          <label for="custom-preset-label">Label</label>
-          <input id="custom-preset-label" type="text" placeholder="My Banner">
-          <div class="dimension-fields">
-            <div>
-              <label for="custom-preset-width">Width</label>
-              <input id="custom-preset-width" type="number" min="1" step="1" placeholder="1200">
-            </div>
-            <div>
-              <label for="custom-preset-height">Height</label>
-              <input id="custom-preset-height" type="number" min="1" step="1" placeholder="628">
-            </div>
+      <section class="panel-card" aria-labelledby="presets-trigger">
+        <button id="presets-trigger" class="accordion-trigger" type="button"
+          aria-expanded="true" aria-controls="presets-body" data-accordion-target="presets-body">
+          <span>Presets</span><span class="chevron" aria-hidden="true"></span>
+        </button>
+        <div id="presets-body" class="accordion-body">
+          <p class="card-helper">Required delivery sizes</p>
+          <div id="preset-list" class="checklist"></div>
+          <button id="create-presets-button" type="button" disabled>Create Selected Presets</button>
+          <p id="status" role="status" aria-live="polite">Ready</p>
+          <div class="catalog-tools">
+            <span id="catalog-info" class="meta">Loading presets…</span>
+            <button id="update-presets-button" class="secondary" type="button">Check Preset Updates</button>
           </div>
-          <button id="add-custom-preset-button" class="secondary" type="button">Add Custom Preset</button>
+          <div class="custom-preset-form" aria-labelledby="custom-preset-heading">
+            <h3 id="custom-preset-heading">Add custom preset</h3>
+            <label for="custom-preset-id">Unique ID</label>
+            <input id="custom-preset-id" type="text" placeholder="my-banner">
+            <label for="custom-preset-label">Label</label>
+            <input id="custom-preset-label" type="text" placeholder="My Banner">
+            <div class="dimension-fields">
+              <div><label for="custom-preset-width">Width</label><input id="custom-preset-width" type="number" min="1" step="1" placeholder="1200"></div>
+              <div><label for="custom-preset-height">Height</label><input id="custom-preset-height" type="number" min="1" step="1" placeholder="628"></div>
+            </div>
+            <button id="add-custom-preset-button" class="secondary" type="button">Add Custom Preset</button>
+          </div>
+          <div class="utility"><button id="rename-button" class="secondary" type="button">Rename Artboards</button></div>
         </div>
       </section>
 
-      <section aria-labelledby="preflight-heading">
-        <h2 id="preflight-heading">Preflight</h2>
-        <p>Required delivery sizes</p>
-        <div id="preflight-preset-list" class="checklist"></div>
-        <button id="run-preflight-button" type="button" disabled>Run Preflight</button>
-        <p id="preflight-summary" class="preflight-summary" role="status" aria-live="polite"></p>
-        <div id="preflight-results"></div>
-        <button id="create-missing-button" class="secondary" type="button" disabled>Create Missing</button>
-        <button id="rename-fixable-button" class="secondary" type="button" disabled>Rename Fixable</button>
+      <section class="panel-card" aria-labelledby="preflight-trigger">
+        <button id="preflight-trigger" class="accordion-trigger" type="button"
+          aria-expanded="true" aria-controls="preflight-body" data-accordion-target="preflight-body">
+          <span>Preflight</span><span class="chevron" aria-hidden="true"></span>
+        </button>
+        <div id="preflight-body" class="accordion-body">
+          <p class="card-helper accent">Run Preflight to verify delivery requirements.</p>
+          <p class="card-helper">Required delivery sizes</p>
+          <div id="preflight-preset-list" class="checklist"></div>
+          <button id="run-preflight-button" type="button" disabled>Run Preflight</button>
+          <div id="preflight-summary" class="preflight-summary" role="status" aria-live="polite"></div>
+          <div id="preflight-results"></div>
+          <div class="preflight-actions">
+            <button id="create-missing-button" class="secondary" type="button" disabled>Create Missing</button>
+            <button id="rename-fixable-button" class="secondary" type="button" disabled>Rename Fixable</button>
+          </div>
+        </div>
       </section>
 
-      <section aria-labelledby="export-heading">
-        <h2 id="export-heading">Export</h2>
-        <label for="format-select">Format</label>
-        <select id="format-select">
-          <option value="png">PNG</option>
-          <option value="jpg">JPG</option>
-        </select>
-        <label for="destination-input">Destination folder</label>
-        <input id="destination-input" type="text" placeholder="/path/to/export folder">
-        <div id="artboard-list" class="checklist"></div>
-        <p id="collision-warning" class="warning" aria-live="polite"></p>
-        <button id="export-button" type="button" disabled>Export Selected</button>
-        <button id="export-verified-button" type="button" disabled>Export Verified Set</button>
-      </section>
-
-      <section class="utility" aria-labelledby="utility-heading">
-        <h2 id="utility-heading">Utilities</h2>
-        <button id="rename-button" class="secondary" type="button">Rename Artboards</button>
+      <section class="panel-card" aria-labelledby="export-trigger">
+        <button id="export-trigger" class="accordion-trigger" type="button"
+          aria-expanded="false" aria-controls="export-body" data-accordion-target="export-body">
+          <span>Export</span><span class="chevron" aria-hidden="true"></span>
+        </button>
+        <div id="export-body" class="accordion-body" hidden>
+          <label for="format-select">Format</label>
+          <select id="format-select"><option value="png">PNG</option><option value="jpg">JPG</option></select>
+          <label for="destination-input">Destination folder</label>
+          <input id="destination-input" type="text" placeholder="/path/to/export folder">
+          <div id="artboard-list" class="checklist"></div>
+          <p id="collision-warning" class="warning" aria-live="polite"></p>
+          <button id="export-button" type="button" disabled>Export Selected</button>
+          <button id="export-verified-button" type="button" disabled>Export Verified Set</button>
+        </div>
       </section>
     </main>
     <script src="CSInterface.js"></script>
