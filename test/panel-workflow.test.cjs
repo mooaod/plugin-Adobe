@@ -615,6 +615,99 @@ test('keeps every preflight action locked until fix mutation and refresh callbac
   assert.equal(panel.document.elements['run-preflight-button'].disabled, false);
 });
 
+test('blocks both export paths until a preflight mutation refresh finishes', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: fourPresetCatalog(), source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    },
+    artboardResults: [
+      { ok: true, artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
+        { index: 1, name: 'Portrait draft', width: 1080, height: 1350 }
+      ] },
+      { ok: true, artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
+        { index: 1, name: 'instagram-portrait_1080x1350 px', width: 1080, height: 1350 }
+      ] }
+    ]
+  });
+  const required = panel.document.elements['preflight-preset-list'].children;
+  const controls = [
+    'run-preflight-button', 'create-missing-button', 'rename-fixable-button',
+    'export-button', 'export-verified-button'
+  ];
+  required[0].children[0].checked = true; required[0].children[0].dispatch('change');
+  required[1].children[0].checked = true; required[1].children[0].dispatch('change');
+  panel.document.elements['run-preflight-button'].dispatch('click');
+  assert.equal(panel.document.elements['rename-fixable-button'].disabled, false);
+  assert.equal(panel.document.elements['export-verified-button'].disabled, false);
+
+  panel.bridge.deferNext('renameArtboards(app, ');
+  panel.bridge.deferNext('listArtboards(app)');
+  panel.document.elements['rename-fixable-button'].dispatch('click');
+
+  controls.forEach(function (id) {
+    assert.equal(panel.document.elements[id].disabled, true, id + ' should be locked');
+  });
+  panel.document.elements['export-button'].dispatch('click');
+  panel.document.elements['export-verified-button'].dispatch('click');
+  assert.equal(panel.bridge.calls.filter(function (call) {
+    return call.indexOf('exportArtboards(app, ') === 0;
+  }).length, 0);
+
+  panel.bridge.completeNext('renameArtboards(app, ');
+  assert.equal(panel.document.elements['export-button'].disabled, true);
+  panel.bridge.completeNext('listArtboards(app)');
+  assert.equal(panel.document.elements['run-preflight-button'].disabled, false);
+  assert.equal(panel.document.elements['export-button'].disabled, false);
+});
+
+test('blocks every preflight action while a normal export callback is pending', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: fourPresetCatalog(), source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    },
+    artboardResult: {
+      ok: true,
+      artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
+        { index: 1, name: 'Portrait draft', width: 1080, height: 1350 }
+      ]
+    }
+  });
+  const required = panel.document.elements['preflight-preset-list'].children;
+  const controls = [
+    'run-preflight-button', 'create-missing-button', 'rename-fixable-button',
+    'export-button', 'export-verified-button'
+  ];
+  required[0].children[0].checked = true; required[0].children[0].dispatch('change');
+  required[1].children[0].checked = true; required[1].children[0].dispatch('change');
+  required[2].children[0].checked = true; required[2].children[0].dispatch('change');
+  panel.document.elements['run-preflight-button'].dispatch('click');
+  assert.equal(panel.document.elements['create-missing-button'].disabled, false);
+  assert.equal(panel.document.elements['rename-fixable-button'].disabled, false);
+
+  panel.bridge.deferNext('exportArtboards(app, ');
+  panel.document.elements['export-button'].dispatch('click');
+
+  controls.forEach(function (id) {
+    assert.equal(panel.document.elements[id].disabled, true, id + ' should be locked');
+  });
+  panel.document.elements['create-missing-button'].dispatch('click');
+  panel.document.elements['rename-fixable-button'].dispatch('click');
+  assert.equal(panel.bridge.calls.filter(function (call) {
+    return call.indexOf('createPresetArtboards(app, ') === 0 ||
+      call.indexOf('renameArtboards(app, ') === 0;
+  }).length, 0);
+
+  panel.bridge.completeNext('exportArtboards(app, ');
+  assert.equal(panel.document.elements['run-preflight-button'].disabled, false);
+  assert.equal(panel.document.elements['create-missing-button'].disabled, false);
+  assert.equal(panel.document.elements['rename-fixable-button'].disabled, false);
+});
+
 test('revalidates current artboards and refuses verified export when the fresh report changes', function () {
   const panel = runPanel({
     cacheState: {
@@ -644,6 +737,87 @@ test('revalidates current artboards and refuses verified export when the fresh r
   assert.equal(panel.bridge.calls.filter(function (call) {
     return call.indexOf('exportArtboards(app, ') === 0;
   }).length, 0);
+});
+
+test('refuses verified export when required presets change during delayed revalidation', function () {
+  const unchangedArtboards = [
+    { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
+    { index: 1, name: 'Portrait draft', width: 1080, height: 1350 }
+  ];
+  const panel = runPanel({
+    cacheState: {
+      catalog: fourPresetCatalog(), source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    },
+    artboardResults: [
+      { ok: true, artboards: unchangedArtboards },
+      { ok: true, artboards: unchangedArtboards }
+    ]
+  });
+  const required = panel.document.elements['preflight-preset-list'].children;
+  required[0].children[0].checked = true;
+  required[0].children[0].dispatch('change');
+  panel.document.elements['run-preflight-button'].dispatch('click');
+
+  panel.bridge.deferNext('listArtboards(app)');
+  panel.document.elements['export-verified-button'].dispatch('click');
+  [
+    'run-preflight-button', 'create-missing-button', 'rename-fixable-button',
+    'export-button', 'export-verified-button'
+  ].forEach(function (id) {
+    assert.equal(panel.document.elements[id].disabled, true, id + ' should be locked');
+  });
+  required[1].children[0].checked = true;
+  required[1].children[0].dispatch('change');
+  panel.bridge.completeNext('listArtboards(app)');
+
+  assert.equal(panel.document.elements['preflight-summary'].textContent, '');
+  assert.match(panel.document.elements.status.textContent, /required|selection|requirements/i);
+  assert.equal(panel.bridge.calls.filter(function (call) {
+    return call.indexOf('exportArtboards(app, ') === 0;
+  }).length, 0);
+});
+
+test('preserves normal export selections when verified revalidation sees unchanged artboards', function () {
+  const unchangedArtboards = [
+    { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
+    { index: 7, name: 'Reference', width: 400, height: 400 }
+  ];
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache',
+      lastSuccessfulCheck: new Date().toISOString()
+    },
+    artboardResults: [
+      { ok: true, artboards: unchangedArtboards },
+      { ok: true, artboards: unchangedArtboards }
+    ]
+  });
+  const required = panel.document.elements['preflight-preset-list'].children;
+  const normalExportSelection = panel.document.elements['artboard-list'].children;
+  required[0].children[0].checked = true;
+  required[0].children[0].dispatch('change');
+  panel.document.elements['run-preflight-button'].dispatch('click');
+  normalExportSelection[1].children[0].checked = false;
+  normalExportSelection[1].children[0].dispatch('change');
+
+  panel.bridge.deferNext('listArtboards(app)');
+  panel.document.elements['export-verified-button'].dispatch('click');
+  panel.bridge.completeNext('listArtboards(app)');
+
+  assert.equal(
+    panel.document.elements['artboard-list'].children[1].children[0].checked,
+    false
+  );
+  panel.document.elements['export-button'].dispatch('click');
+  const exportCalls = panel.bridge.calls.filter(function (call) {
+    return call.indexOf('exportArtboards(app, ') === 0;
+  });
+  const normalExportPayload = hostCallPayload(
+    exportCalls[exportCalls.length - 1],
+    'exportArtboards(app, '
+  );
+  assert.deepEqual(normalExportPayload.artboardIndexes, [0]);
 });
 
 test('shares one export lock through the initial call and confirmed overwrite retry', function () {

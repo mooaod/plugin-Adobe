@@ -217,14 +217,18 @@
       });
   }
 
+  function operationBusy() {
+    return preflightBusy || exportBusy;
+  }
+
   function updatePreflightState() {
-    runPreflightButton.disabled = preflightBusy || !hostReady ||
+    runPreflightButton.disabled = operationBusy() || !hostReady ||
       selectedPreflightPresets().length === 0;
-    createMissingButton.disabled = preflightBusy || !hostReady || !preflightReport ||
+    createMissingButton.disabled = operationBusy() || !hostReady || !preflightReport ||
       preflightReport.summary.missing === 0;
-    renameFixableButton.disabled = preflightBusy || !hostReady || !preflightReport ||
+    renameFixableButton.disabled = operationBusy() || !hostReady || !preflightReport ||
       preflightReport.summary.rename === 0;
-    exportVerifiedButton.disabled = preflightBusy || exportBusy || !hostReady ||
+    exportVerifiedButton.disabled = operationBusy() || !hostReady ||
       !preflightCanExport(preflightReport) ||
       !destinationInput.value.trim();
   }
@@ -259,7 +263,7 @@
 
   function runPreflight() {
     var requiredPresets = selectedPreflightPresets();
-    if (preflightBusy || !hostReady || !requiredPresets.length) {
+    if (operationBusy() || !hostReady || !requiredPresets.length) {
       updatePreflightState();
       return;
     }
@@ -341,7 +345,7 @@
   function updateExportState() {
     var selected = selectedArtboards();
     var collisions = findFilenameCollisions(selected, formatSelect.value);
-    if (!hostReady || exportBusy) {
+    if (!hostReady || operationBusy()) {
       exportButton.disabled = true;
       return;
     }
@@ -381,6 +385,31 @@
       artboardCheckboxes.push(checkbox);
     }
     updateExportState();
+  }
+
+  function hasSameArtboardSnapshot(previousItems, currentItems) {
+    var i;
+    if (previousItems.length !== currentItems.length) {
+      return false;
+    }
+    for (i = 0; i < previousItems.length; i += 1) {
+      if (previousItems[i].index !== currentItems[i].index ||
+          previousItems[i].name !== currentItems[i].name ||
+          previousItems[i].width !== currentItems[i].width ||
+          previousItems[i].height !== currentItems[i].height) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function updateRevalidatedArtboards(items) {
+    if (hasSameArtboardSnapshot(artboards, items)) {
+      artboards = items;
+      updateExportState();
+      return;
+    }
+    renderArtboards(items);
   }
 
   function parseHostResult(rawResult) {
@@ -675,6 +704,7 @@
   function finishPreflightMutation() {
     refreshArtboards(function () {
       preflightBusy = false;
+      updateExportState();
       updatePreflightState();
     });
   }
@@ -682,7 +712,7 @@
   createMissingButton.addEventListener('click', function () {
     var missing = [];
     var i;
-    if (preflightBusy || !hostReady || !preflightReport) {
+    if (operationBusy() || !hostReady || !preflightReport) {
       updatePreflightState();
       return;
     }
@@ -697,6 +727,7 @@
     }
     preflightBusy = true;
     clearPreflightReport();
+    updateExportState();
     setStatus('Creating missing preset artboards…');
     try {
       csInterface.evalScript(
@@ -711,6 +742,7 @@
       );
     } catch (error) {
       preflightBusy = false;
+      updateExportState();
       updatePreflightState();
       setStatus('Could not start creating missing artboards. Please try again.');
     }
@@ -718,7 +750,7 @@
 
   renameFixableButton.addEventListener('click', function () {
     var changes;
-    if (preflightBusy || !hostReady || !preflightReport) {
+    if (operationBusy() || !hostReady || !preflightReport) {
       updatePreflightState();
       return;
     }
@@ -729,6 +761,7 @@
     }
     preflightBusy = true;
     clearPreflightReport();
+    updateExportState();
     setStatus('Renaming fixable artboards…');
     try {
       csInterface.evalScript(
@@ -743,6 +776,7 @@
       );
     } catch (error) {
       preflightBusy = false;
+      updateExportState();
       updatePreflightState();
       setStatus('Could not start renaming fixable artboards. Please try again.');
     }
@@ -799,7 +833,7 @@
     var collisions = findFilenameCollisions(selected, formatSelect.value);
     var indexes = [];
     var i;
-    if (exportBusy || !hostReady) {
+    if (operationBusy() || !hostReady) {
       updateExportState();
       setStatus(hostLoadError ? hostFailureMessage() : 'Social workflow is not ready yet.');
       return;
@@ -850,9 +884,40 @@
     return true;
   }
 
+  function requiredPresetIdentitySnapshot(requiredPresets) {
+    var snapshot = [];
+    var i;
+    for (i = 0; i < requiredPresets.length; i += 1) {
+      snapshot.push({
+        id: requiredPresets[i].id,
+        width: requiredPresets[i].width,
+        height: requiredPresets[i].height
+      });
+    }
+    return snapshot;
+  }
+
+  function hasSameRequiredPresetSnapshot(snapshot, requiredPresets) {
+    var i;
+    if (snapshot.length !== requiredPresets.length) {
+      return false;
+    }
+    for (i = 0; i < snapshot.length; i += 1) {
+      if (snapshot[i].id !== requiredPresets[i].id ||
+          snapshot[i].width !== requiredPresets[i].width ||
+          snapshot[i].height !== requiredPresets[i].height) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   exportVerifiedButton.addEventListener('click', function () {
     var approvedReport = preflightReport;
-    if (preflightBusy || exportBusy || !hostReady || !preflightCanExport(approvedReport) ||
+    var approvedRequiredPresetSnapshot = requiredPresetIdentitySnapshot(
+      selectedPreflightPresets()
+    );
+    if (operationBusy() || !hostReady || !preflightCanExport(approvedReport) ||
         !destinationInput.value.trim()) {
       updatePreflightState();
       return;
@@ -873,8 +938,20 @@
           finishExport();
           return;
         }
-        renderArtboards(result.artboards);
+        updateRevalidatedArtboards(result.artboards);
         requiredPresets = selectedPreflightPresets();
+        if (!hasSameRequiredPresetSnapshot(
+          approvedRequiredPresetSnapshot,
+          requiredPresets
+        )) {
+          clearPreflightReport();
+          setStatus(
+            'Verified export stopped because the required preset selection changed. ' +
+            'Run Preflight again.'
+          );
+          finishExport();
+          return;
+        }
         freshReport = buildPreflightReport(requiredPresets, result.artboards);
         preflightReport = freshReport;
         renderPreflightReport(freshReport);
