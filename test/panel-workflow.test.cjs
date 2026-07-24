@@ -1726,6 +1726,39 @@ test('deletes a custom preset only after modal confirmation', function () {
   assert.match(panel.document.elements.status.textContent, /Deleted custom preset Saved Custom/);
 });
 
+test('keeps an open custom preset deletion pending while a host operation is busy', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache', lastSuccessfulCheck: new Date().toISOString()
+    },
+    customState: {
+      schemaVersion: 1,
+      presets: [{ id: 'saved', label: 'Saved Custom', width: 321, height: 654 }]
+    }
+  });
+  const required = panel.document.elements['preflight-preset-list'].children[0].children[0];
+
+  panel.document.elements['preset-list'].children[1].children[3].dispatch('click');
+  required.checked = true;
+  required.dispatch('change');
+  panel.bridge.deferNext('listArtboards(app)');
+  panel.document.elements['run-preflight-button'].dispatch('click');
+  panel.document.elements['confirm-delete-preset-button'].dispatch('click');
+
+  assert.equal(panel.document.elements['delete-preset-modal'].hidden, false);
+  assert.match(
+    panel.document.elements['delete-preset-modal-message'].textContent,
+    /Saved Custom/
+  );
+  assert.equal(panel.writes.length, 0);
+
+  panel.bridge.completeNext('listArtboards(app)');
+  panel.document.elements['confirm-delete-preset-button'].dispatch('click');
+
+  assert.equal(panel.document.elements['delete-preset-modal'].hidden, true);
+  assert.deepEqual(JSON.parse(panel.writes[0].data), { schemaVersion: 1, presets: [] });
+});
+
 test('cancels custom preset deletion without writing and restores focus', function () {
   const panel = runPanel({
     cacheState: {
@@ -1787,7 +1820,38 @@ test('keeps a custom preset when deletion cannot be persisted', function () {
 
   assert.equal(panel.document.elements['preset-list'].children.length, 2);
   assert.equal(panel.document.elements['preflight-preset-list'].children.length, 2);
+  assert.equal(
+    panel.document.elements['preset-list'].children[1].children[3].focused,
+    true
+  );
   assert.match(panel.document.elements.status.textContent, /Could not delete/);
+});
+
+test('restores focus to the current Delete button after a pending modal rerenders', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache', lastSuccessfulCheck: new Date().toISOString()
+    },
+    customState: {
+      schemaVersion: 1,
+      presets: [{ id: 'saved', label: 'Saved Custom', width: 321, height: 654 }]
+    },
+    remote: { type: 'load', status: 200, body: JSON.stringify(catalog('2.0.0')) }
+  });
+  const oldDeleteButton = panel.document.elements['preset-list'].children[1].children[3];
+
+  oldDeleteButton.dispatch('click');
+  panel.document.elements['update-presets-button'].dispatch('click');
+  const currentDeleteButton = panel.document.elements['preset-list'].children[1].children[3];
+  panel.document.elements['cancel-delete-preset-button'].dispatch('click');
+
+  assert.notEqual(currentDeleteButton, oldDeleteButton);
+  assert.equal(panel.document.elements['delete-preset-modal'].hidden, true);
+  assert.equal(oldDeleteButton.focused, undefined);
+  assert.equal(currentDeleteButton.focused, true);
+  assert.equal(panel.writes.filter(function (write) {
+    return write.filePath.indexOf('social-presets-custom.json') >= 0;
+  }).length, 0);
 });
 
 test('locks custom preset deletion while a host operation is pending', function () {

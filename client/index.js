@@ -477,25 +477,32 @@
         if (!persistCustomPresets()) {
           customPresets.splice(index, 0, preset);
           setStatus('Could not delete the custom preset.');
-          return;
+          return false;
         }
         renderCatalog(activeBaseCatalog, catalogSource);
         setStatus('Deleted custom preset ' + preset.label + '.');
-        return;
+        return true;
       }
     }
+    return false;
   }
 
   function confirmDeletePreset() {
     var preset = pendingDeletePreset;
+    var trigger = pendingDeleteTrigger;
+    if (operationBusy()) {
+      updateOperationState();
+      return;
+    }
     closeDeletePresetDialog(false);
-    if (preset) {
-      deleteCustomPreset(preset);
+    if (preset && !deleteCustomPreset(preset) && trigger && trigger.focus) {
+      trigger.focus();
     }
   }
 
   function renderCatalog(catalog, source) {
     var i;
+    var pendingDeletePresetFound = false;
     activeBaseCatalog = catalog;
     activeCatalog = mergeCatalogWithCustom(catalog, customPresets);
     catalogSource = source;
@@ -540,6 +547,10 @@
         label.appendChild(customBadge);
         label.appendChild(deleteButton);
         deletePresetButtons.push(deleteButton);
+        if (pendingDeletePreset && pendingDeletePreset.id === preset.id) {
+          pendingDeleteTrigger = deleteButton;
+          pendingDeletePresetFound = true;
+        }
       }
       presetList.appendChild(label);
       presetCheckboxes.push(checkbox);
@@ -554,6 +565,9 @@
       preflightLabel.appendChild(preflightDescription);
       preflightPresetList.appendChild(preflightLabel);
       preflightCheckboxes.push(preflightCheckbox);
+    }
+    if (pendingDeletePreset && !pendingDeletePresetFound) {
+      closeDeletePresetDialog(false);
     }
     clearPreflightReport();
     updateOperationState();
