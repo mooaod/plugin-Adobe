@@ -66,3 +66,23 @@ test('panel controller invokes the host rename operation and reports its result'
   assert.match(source, /button\.disabled\s*=\s*operationBusy\(\)/);
   assert.match(source, /result\.renamed/);
 });
+
+test('panel provides an accessible hidden custom preset delete modal', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'client', 'index.html'), 'utf8');
+
+  assert.match(html, /<div\b(?=[^>]*\bid="delete-preset-modal")(?=[^>]*\brole="dialog")(?=[^>]*\baria-modal="true")(?=[^>]*\baria-labelledby="delete-preset-modal-title")(?=[^>]*\baria-describedby="delete-preset-modal-message")(?=[^>]*\bhidden)[^>]*>/);
+  assert.match(html, /<h2 id="delete-preset-modal-title">Delete Custom Preset\?<\/h2>/);
+  assert.match(html, /<p id="delete-preset-modal-message"><\/p>/);
+  assert.match(html, /<button id="cancel-delete-preset-button"[^>]*>Cancel<\/button>/);
+  assert.match(html, /<button id="confirm-delete-preset-button"[^>]*>Delete<\/button>/);
+});
+
+test('panel stylesheet defines the compact destructive modal treatment', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'client', 'style.css'), 'utf8');
+
+  assert.match(css, /\.modal-overlay\s*\{[^}]*position:\s*fixed;[^}]*inset:\s*0;/);
+  assert.match(css, /\.modal-overlay\[hidden\]\s*\{[^}]*display:\s*none/);
+  assert.match(css, /\.confirmation-modal\s*\{[^}]*max-width:\s*320px/);
+  assert.match(css, /\.modal-actions\s*\{[^}]*display:\s*flex/);
+  assert.match(css, /button\.destructive\s*\{[^}]*border-color:\s*#b94a4a/);
+});
