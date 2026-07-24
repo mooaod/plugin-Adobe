@@ -20,6 +20,10 @@
   var customPresetWidth = document.getElementById('custom-preset-width');
   var customPresetHeight = document.getElementById('custom-preset-height');
   var addCustomPresetButton = document.getElementById('add-custom-preset-button');
+  var deletePresetModal = document.getElementById('delete-preset-modal');
+  var deletePresetModalMessage = document.getElementById('delete-preset-modal-message');
+  var cancelDeletePresetButton = document.getElementById('cancel-delete-preset-button');
+  var confirmDeletePresetButton = document.getElementById('confirm-delete-preset-button');
   var preflightPresetList = document.getElementById('preflight-preset-list');
   var runPreflightButton = document.getElementById('run-preflight-button');
   var preflightSummary = document.getElementById('preflight-summary');
@@ -43,6 +47,8 @@
   var hostLoadError = '';
   var cachedState = readCache();
   var customPresets = readCustomPresets();
+  var pendingDeletePreset = null;
+  var pendingDeleteTrigger = null;
 
   function initializeAccordions() {
     var triggers = document.querySelectorAll
@@ -438,15 +444,33 @@
     return false;
   }
 
-  function deleteCustomPreset(preset) {
-    var index;
+  function closeDeletePresetDialog(restoreFocus) {
+    var trigger = pendingDeleteTrigger;
+    pendingDeletePreset = null;
+    pendingDeleteTrigger = null;
+    deletePresetModal.hidden = true;
+    if (restoreFocus && trigger && trigger.focus) {
+      trigger.focus();
+    }
+  }
+
+  function openDeletePresetDialog(preset, trigger) {
     if (operationBusy()) {
       updateOperationState();
       return;
     }
-    if (!window.confirm('Delete custom preset "' + preset.label + '"?')) {
-      return;
+    pendingDeletePreset = preset;
+    pendingDeleteTrigger = trigger;
+    deletePresetModalMessage.textContent =
+      'Delete custom preset "' + preset.label + '"? This cannot be undone.';
+    deletePresetModal.hidden = false;
+    if (cancelDeletePresetButton.focus) {
+      cancelDeletePresetButton.focus();
     }
+  }
+
+  function deleteCustomPreset(preset) {
+    var index;
     for (index = 0; index < customPresets.length; index += 1) {
       if (customPresets[index].id === preset.id) {
         customPresets.splice(index, 1);
@@ -459,6 +483,14 @@
         setStatus('Deleted custom preset ' + preset.label + '.');
         return;
       }
+    }
+  }
+
+  function confirmDeletePreset() {
+    var preset = pendingDeletePreset;
+    closeDeletePresetDialog(false);
+    if (preset) {
+      deleteCustomPreset(preset);
     }
   }
 
@@ -502,7 +534,7 @@
         deleteButton.setAttribute('aria-label', 'Delete custom preset ' + preset.label);
         deleteButton.addEventListener('click', (function (customPreset) {
           return function () {
-            deleteCustomPreset(customPreset);
+            openDeletePresetDialog(customPreset, this);
           };
         }(preset)));
         label.appendChild(customBadge);
@@ -1199,6 +1231,16 @@
   destinationInput.addEventListener('input', function () {
     updateExportState();
     updatePreflightState();
+  });
+  cancelDeletePresetButton.addEventListener('click', function () {
+    closeDeletePresetDialog(true);
+  });
+  confirmDeletePresetButton.addEventListener('click', confirmDeletePreset);
+  deletePresetModal.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeDeletePresetDialog(true);
+    }
   });
 
   initializeAccordions();

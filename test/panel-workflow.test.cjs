@@ -120,10 +120,14 @@ class FakeElement {
     this.listeners[type] = listener;
   }
 
-  dispatch(type) {
+  dispatch(type, event) {
     if (this.listeners[type]) {
-      this.listeners[type].call(this, { target: this });
+      this.listeners[type].call(this, event || { target: this });
     }
+  }
+
+  focus() {
+    this.focused = true;
   }
 }
 
@@ -137,7 +141,9 @@ function fakeDocument() {
     'preflight-preset-list', 'run-preflight-button', 'preflight-summary',
     'preflight-results', 'create-missing-button', 'rename-fixable-button',
     'export-verified-button', 'presets-trigger', 'presets-body',
-    'preflight-trigger', 'preflight-body', 'export-trigger', 'export-body'
+    'preflight-trigger', 'preflight-body', 'export-trigger', 'export-body',
+    'delete-preset-modal', 'delete-preset-modal-message',
+    'cancel-delete-preset-button', 'confirm-delete-preset-button'
   ];
   const elements = {};
   ids.forEach(function (id) {
@@ -152,6 +158,7 @@ function fakeDocument() {
   elements['export-trigger'].dataset.accordionTarget = 'export-body';
   elements['export-trigger'].setAttribute('aria-expanded', 'false');
   elements['export-body'].hidden = true;
+  elements['delete-preset-modal'].hidden = true;
 
   return {
     elements: elements,
@@ -1673,7 +1680,7 @@ test('shows Custom and Delete only for custom presets', function () {
   assert.equal(customPreflightRow.children.length, 2);
 });
 
-test('deletes a confirmed custom preset from its separate store', function () {
+test('opens an in-panel named confirmation without native confirm', function () {
   const panel = runPanel({
     cacheState: {
       catalog: catalog(), source: 'cache', lastSuccessfulCheck: new Date().toISOString()
@@ -1681,23 +1688,45 @@ test('deletes a confirmed custom preset from its separate store', function () {
     customState: {
       schemaVersion: 1,
       presets: [{ id: 'saved', label: 'Saved Custom', width: 321, height: 654 }]
-    },
-    confirmDelete: true
+    }
   });
 
   panel.document.elements['preset-list'].children[1].children[3].dispatch('click');
+
+  assert.equal(panel.document.elements['delete-preset-modal'].hidden, false);
+  assert.match(
+    panel.document.elements['delete-preset-modal-message'].textContent,
+    /Saved Custom/
+  );
+  assert.equal(panel.document.elements['cancel-delete-preset-button'].focused, true);
+  assert.equal(panel.confirmMessages.length, 0);
+  assert.equal(panel.writes.length, 0);
+});
+
+test('deletes a custom preset only after modal confirmation', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache', lastSuccessfulCheck: new Date().toISOString()
+    },
+    customState: {
+      schemaVersion: 1,
+      presets: [{ id: 'saved', label: 'Saved Custom', width: 321, height: 654 }]
+    }
+  });
+
+  panel.document.elements['preset-list'].children[1].children[3].dispatch('click');
+  panel.document.elements['confirm-delete-preset-button'].dispatch('click');
 
   const customWrite = panel.writes.find(function (write) {
     return write.filePath.indexOf('social-presets-custom.json') >= 0;
   });
-  assert.match(panel.confirmMessages[0], /Delete custom preset "Saved Custom"/);
   assert.deepEqual(JSON.parse(customWrite.data), { schemaVersion: 1, presets: [] });
+  assert.equal(panel.document.elements['delete-preset-modal'].hidden, true);
   assert.equal(panel.document.elements['preset-list'].children.length, 1);
-  assert.equal(panel.document.elements['preflight-preset-list'].children.length, 1);
   assert.match(panel.document.elements.status.textContent, /Deleted custom preset Saved Custom/);
 });
 
-test('does not delete a custom preset when confirmation is cancelled', function () {
+test('cancels custom preset deletion without writing and restores focus', function () {
   const panel = runPanel({
     cacheState: {
       catalog: catalog(), source: 'cache', lastSuccessfulCheck: new Date().toISOString()
@@ -1705,16 +1734,40 @@ test('does not delete a custom preset when confirmation is cancelled', function 
     customState: {
       schemaVersion: 1,
       presets: [{ id: 'saved', label: 'Saved Custom', width: 321, height: 654 }]
-    },
-    confirmDelete: false
+    }
   });
+  const deleteButton = panel.document.elements['preset-list'].children[1].children[3];
+
+  deleteButton.dispatch('click');
+  panel.document.elements['cancel-delete-preset-button'].dispatch('click');
+
+  assert.equal(panel.document.elements['delete-preset-modal'].hidden, true);
+  assert.equal(panel.writes.length, 0);
+  assert.equal(deleteButton.focused, true);
+  assert.equal(panel.document.elements['preset-list'].children.length, 2);
+});
+
+test('Escape cancels custom preset deletion without writing', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache', lastSuccessfulCheck: new Date().toISOString()
+    },
+    customState: {
+      schemaVersion: 1,
+      presets: [{ id: 'saved', label: 'Saved Custom', width: 321, height: 654 }]
+    }
+  });
+  let prevented = false;
 
   panel.document.elements['preset-list'].children[1].children[3].dispatch('click');
+  panel.document.elements['delete-preset-modal'].dispatch('keydown', {
+    key: 'Escape',
+    preventDefault: function () { prevented = true; }
+  });
 
-  assert.match(panel.confirmMessages[0], /Delete custom preset "Saved Custom"/);
+  assert.equal(prevented, true);
+  assert.equal(panel.document.elements['delete-preset-modal'].hidden, true);
   assert.equal(panel.writes.length, 0);
-  assert.equal(panel.document.elements['preset-list'].children.length, 2);
-  assert.equal(panel.document.elements['preflight-preset-list'].children.length, 2);
 });
 
 test('keeps a custom preset when deletion cannot be persisted', function () {
@@ -1726,11 +1779,11 @@ test('keeps a custom preset when deletion cannot be persisted', function () {
       schemaVersion: 1,
       presets: [{ id: 'saved', label: 'Saved Custom', width: 321, height: 654 }]
     },
-    confirmDelete: true,
     customWriteError: true
   });
 
   panel.document.elements['preset-list'].children[1].children[3].dispatch('click');
+  panel.document.elements['confirm-delete-preset-button'].dispatch('click');
 
   assert.equal(panel.document.elements['preset-list'].children.length, 2);
   assert.equal(panel.document.elements['preflight-preset-list'].children.length, 2);
@@ -1745,8 +1798,7 @@ test('locks custom preset deletion while a host operation is pending', function 
     customState: {
       schemaVersion: 1,
       presets: [{ id: 'saved', label: 'Saved Custom', width: 321, height: 654 }]
-    },
-    confirmDelete: true
+    }
   });
   const required = panel.document.elements['preflight-preset-list'].children[0].children[0];
   const deleteButton = panel.document.elements['preset-list'].children[1].children[3];
@@ -1758,7 +1810,7 @@ test('locks custom preset deletion while a host operation is pending', function 
 
   assert.equal(deleteButton.disabled, true);
   deleteButton.dispatch('click');
-  assert.equal(panel.confirmMessages.length, 0);
+  assert.equal(panel.document.elements['delete-preset-modal'].hidden, true);
   panel.bridge.completeNext('listArtboards(app)');
   assert.equal(deleteButton.disabled, false);
 });
