@@ -1,41 +1,33 @@
-# Final Schema-Order Fix Report
+# Final UI Fix Report / รายงานการแก้ไข UI รอบสุดท้าย
 
-## Scope
+## Scope / ขอบเขต
 
-- Moved the existing CEP `<Icons>` block after `</Geometry>` in `CSXS/manifest.xml`; icon paths and types are unchanged.
-- Added a focused manifest test asserting that `<Geometry>` precedes `<Icons>`.
-- Corrected Task 2 of the panel-icon plan so its instruction and XML example place icons after `</Geometry>`.
-- Did not copy or install any files into an external CEP folder.
+- Added CEP-compatible wrapping for long dynamic preflight result labels and artboard names.
+- Made the header menu glyph decorative and inaccessible to keyboard and assistive technology until it has a function.
+- Hid the repeated visual preflight badge from assistive technology while retaining the spoken count label.
+- Updated the document title to **Artboard Size Renamer**.
+- Strengthened focused regression coverage for card independence, preserved state, stale-report clearing, and static markup assertions.
 
-## TDD evidence
+## TDD evidence / หลักฐาน TDD
 
-### RED
+1. **RED:** `node --test test/panel.test.cjs test/panel-workflow.test.cjs`
+   - 45 passed, 4 failed as expected.
+   - Failures identified the missing badge `aria-hidden`, document title, decorative header markup, and `.preflight-result` wrapping declarations.
+2. **GREEN:** The same focused command passed with 49 tests and 0 failures after the minimal implementation changes.
+3. **Sizing guard:** A focused stylesheet assertion failed before the decorative span received `box-sizing: border-box`, then passed after the minimal visual-preservation rule was added.
 
-After adding the focused assertion and before changing the manifest, `node --test test/manifest.test.cjs` exited with 1 failure out of 5 tests. The failure was the new assertion:
+## Verification / การตรวจสอบ
 
-```
-AssertionError [ERR_ASSERTION]: CEP UI elements must declare Geometry before Icons
-```
+- `git diff --check` completed without whitespace errors.
+- Full suite: `npm test` completed with 106 passing tests and 0 failures.
+- Focused tests verify:
+  - long preflight results use both `overflow-wrap: anywhere` and `word-break: break-word`;
+  - every accordion trigger assertion is confined to one opening button tag, preventing a later trigger from satisfying it;
+  - all three cards can collapse independently while destination, selected artboards, required selections, and the preflight report remain intact;
+  - failed refreshes clear both summary and detailed results and disable stale actions;
+  - the icon and repeated badge are hidden from assistive technology while the count label remains available.
 
-### GREEN
+## Concerns / ข้อสังเกต
 
-After moving the block, `node --test test/manifest.test.cjs` passed 5 of 5 tests. `npm test` passed 57 of 57 tests. `git diff --check` exited successfully with no output.
-
-## Files changed
-
-- `CSXS/manifest.xml`
-- `test/manifest.test.cjs`
-- `docs/superpowers/plans/2026-07-20-panel-icon.md`
-- `.superpowers/sdd/final-fix-report.md`
-
-## Self-review
-
-Reviewed the scoped diff: only the UI element order, its regression assertion, and the corresponding Task 2 documentation changed. No icon path or type changed.
-
-## Commit
-
-`fix: order CEP panel UI icon declarations` (the final HEAD commit)
-
-## Concerns
-
-None.
+- No Illustrator installation, restart, host workflow, catalog, export, or preflight business logic changes were made.
+- CSS assertions cover the narrow-panel overflow regression. Manual Illustrator rendering was intentionally not performed under the task constraints.

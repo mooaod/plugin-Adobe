@@ -69,8 +69,10 @@ class FakeElement {
     this.tagName = tagName || 'div';
     this.children = [];
     this.dataset = {};
+    this.attributes = {};
+    this.hidden = false;
     this.listeners = {};
-    this.textContent = '';
+    this._textContent = '';
     this.value = '';
     this.checked = false;
     this.disabled = false;
@@ -78,9 +80,28 @@ class FakeElement {
     this.type = '';
   }
 
+  setAttribute(name, value) {
+    this.attributes[name] = String(value);
+  }
+
+  getAttribute(name) {
+    return this.attributes[name] || null;
+  }
+
   appendChild(child) {
     this.children.push(child);
     return child;
+  }
+
+  get textContent() {
+    return this._textContent + this.children.map(function (child) {
+      return child.textContent;
+    }).join('');
+  }
+
+  set textContent(value) {
+    this._textContent = String(value);
+    this.children = [];
   }
 
   get firstChild() {
@@ -101,7 +122,7 @@ class FakeElement {
 
   dispatch(type) {
     if (this.listeners[type]) {
-      this.listeners[type]({ target: this });
+      this.listeners[type].call(this, { target: this });
     }
   }
 }
@@ -115,7 +136,8 @@ function fakeDocument() {
     'custom-preset-height', 'add-custom-preset-button',
     'preflight-preset-list', 'run-preflight-button', 'preflight-summary',
     'preflight-results', 'create-missing-button', 'rename-fixable-button',
-    'export-verified-button'
+    'export-verified-button', 'presets-trigger', 'presets-body',
+    'preflight-trigger', 'preflight-body', 'export-trigger', 'export-body'
   ];
   const elements = {};
   ids.forEach(function (id) {
@@ -123,11 +145,27 @@ function fakeDocument() {
   });
   elements['format-select'].value = 'png';
   elements['destination-input'].value = '/exports';
+  elements['presets-trigger'].dataset.accordionTarget = 'presets-body';
+  elements['presets-trigger'].setAttribute('aria-expanded', 'true');
+  elements['preflight-trigger'].dataset.accordionTarget = 'preflight-body';
+  elements['preflight-trigger'].setAttribute('aria-expanded', 'true');
+  elements['export-trigger'].dataset.accordionTarget = 'export-body';
+  elements['export-trigger'].setAttribute('aria-expanded', 'false');
+  elements['export-body'].hidden = true;
 
   return {
     elements: elements,
     getElementById: function (id) { return elements[id] || null; },
-    createElement: function (tagName) { return new FakeElement('', tagName); }
+    createElement: function (tagName) { return new FakeElement('', tagName); },
+    querySelectorAll: function (selector) {
+      return selector === '.accordion-trigger'
+        ? [
+          elements['presets-trigger'],
+          elements['preflight-trigger'],
+          elements['export-trigger']
+        ]
+        : [];
+    }
   };
 }
 
@@ -522,6 +560,81 @@ test('starts required delivery presets unchecked and disables preflight actions'
   assert.equal(panel.document.elements['export-verified-button'].disabled, true);
 });
 
+test('accordion cards collapse independently while preserving destination, report, and selections', function () {
+  const panel = runPanel({ bundledCatalog: fourPresetCatalog() });
+  const presets = panel.document.elements['presets-body'];
+  const preflight = panel.document.elements['preflight-body'];
+  const exportBody = panel.document.elements['export-body'];
+  const presetsTrigger = panel.document.elements['presets-trigger'];
+  const preflightTrigger = panel.document.elements['preflight-trigger'];
+  const exportTrigger = panel.document.elements['export-trigger'];
+  const required = panel.document.elements['preflight-preset-list'].children[0].children[0];
+  const normalExportSelection = panel.document.elements['artboard-list'].children[0].children[0];
+
+  required.checked = true;
+  required.dispatch('change');
+  normalExportSelection.checked = false;
+  normalExportSelection.dispatch('change');
+  panel.document.elements['destination-input'].value = '/preserved-destination';
+  panel.document.elements['destination-input'].dispatch('input');
+  panel.document.elements['run-preflight-button'].dispatch('click');
+
+  presetsTrigger.dispatch('click');
+  assert.equal(presets.hidden, true);
+  assert.equal(preflight.hidden, false);
+  assert.equal(exportBody.hidden, true);
+  preflightTrigger.dispatch('click');
+  assert.equal(preflight.hidden, true);
+  assert.equal(presets.hidden, true);
+  assert.equal(exportBody.hidden, true);
+  exportTrigger.dispatch('click');
+  assert.equal(exportBody.hidden, false);
+  assert.equal(exportTrigger.getAttribute('aria-expanded'), 'true');
+  assert.equal(presets.hidden, true);
+  assert.equal(preflight.hidden, true);
+  exportTrigger.dispatch('click');
+  assert.equal(exportBody.hidden, true);
+  assert.equal(panel.document.elements['destination-input'].value, '/preserved-destination');
+  assert.equal(required.checked, true);
+  assert.equal(normalExportSelection.checked, false);
+  assert.equal(panel.document.elements['preflight-summary'].children.length, 4);
+  assert.equal(panel.document.elements['preflight-results'].children.length, 1);
+});
+
+test('preflight renders fixed-order semantic summary rows for every status', function () {
+  const panel = runPanel({
+    bundledCatalog: fourPresetCatalog(),
+    artboardResult: {
+      ok: true,
+      artboards: [
+        { index: 0, name: 'instagram-feed_1080x1080 px', width: 1080, height: 1080 },
+        { index: 1, name: 'Portrait draft', width: 1080, height: 1350 },
+        { index: 2, name: 'instagram-story_1080x1920 px', width: 1080, height: 1920 }
+      ]
+    }
+  });
+  const required = panel.document.elements['preflight-preset-list'].children;
+  let i;
+
+  for (i = 0; i < required.length; i += 1) {
+    required[i].children[0].checked = true;
+    required[i].children[0].dispatch('change');
+  }
+  panel.document.elements['run-preflight-button'].dispatch('click');
+
+  assert.equal(panel.document.elements['preflight-summary'].children.length, 4);
+  assert.deepEqual(
+    panel.document.elements['preflight-summary'].children.map(function (row) {
+      return row.dataset.status + ':' + row.children[1].textContent;
+    }),
+    ['pass:2 Pass', 'rename:1 Rename', 'missing:1 Missing', 'duplicate:0 Duplicate']
+  );
+  assert.equal(panel.document.elements['preflight-summary'].children[0].children[0].textContent, '✓');
+  assert.equal(panel.document.elements['preflight-summary'].children[0].children[0].getAttribute('aria-hidden'), 'true');
+  assert.equal(panel.document.elements['preflight-summary'].children[0].children[2].textContent, 'Pass');
+  assert.equal(panel.document.elements['preflight-summary'].children[0].children[2].getAttribute('aria-hidden'), 'true');
+});
+
 test('Run Preflight fetches Illustrator changes again before every rerun and renders matching names', function () {
   const panel = runPanel({
     cacheState: {
@@ -621,6 +734,10 @@ test('Run Preflight reports document closure, clears stale results, and unlocks 
   panel.bridge.completeNext('listArtboards(app)');
 
   assert.equal(panel.document.elements['preflight-summary'].textContent, '');
+  assert.equal(panel.document.elements['preflight-results'].textContent, '');
+  assert.equal(panel.document.elements['create-missing-button'].disabled, true);
+  assert.equal(panel.document.elements['rename-fixable-button'].disabled, true);
+  assert.equal(panel.document.elements['export-verified-button'].disabled, true);
   assert.equal(panel.document.elements['artboard-list'].children.length, 0);
   assert.match(panel.document.elements.status.textContent, /Open an Illustrator document first/);
   assert.equal(panel.document.elements['run-preflight-button'].disabled, false);
