@@ -150,3 +150,49 @@ Actual result after the minimal implementation: **65 tests, 65 passed,
 - Automated coverage exercises the panel controller through its fake DOM and
   statically enforces the CEP-compatible CSS declarations. The extension was
   not manually launched in Illustrator/CEP during this fix wave.
+
+---
+
+## Follow-up: compact preset-description label spacing / งานติดตาม: ระยะขอบของ label คำอธิบาย preset
+
+### Finding and fix / ข้อค้นพบและการแก้ไข
+
+Changing `.preset-description` from `span` to `label` caused it to inherit the
+global `label { margin: 8px 0 4px; }` rule, which inflated and misaligned the
+compact preset row. The focused fix adds `margin: 0` to
+`.preset-description`; no other declarations or behavior changed.
+
+### TDD evidence / หลักฐาน TDD
+
+**RED**
+
+Command:
+
+`node --test --test-name-pattern="preset description label preserves compact row spacing" test/panel.test.cjs`
+
+Actual result before the CSS fix: **1 test, 0 passed, 1 failed, exit code 1**.
+The assertion failed because the `.preset-description` rule did not contain
+`margin: 0`; the stylesheet loaded and the test executed without fixture or
+syntax errors.
+
+**GREEN**
+
+Command:
+
+`node --test --test-name-pattern="preset description label preserves compact row spacing" test/panel.test.cjs`
+
+Actual result after the one-line CSS fix: **1 test, 1 passed, 0 failed,
+exit code 0**.
+
+### Full verification / การตรวจสอบทั้งหมด
+
+- `npm test`: **123 tests, 123 passed, 0 failed, exit code 0**.
+- `git diff --check`: **exit code 0**, no whitespace errors before this report
+  append; a final check is run again with the appended report included.
+- Self-review confirmed the diff is limited to the focused stylesheet
+  regression test, the `margin: 0` override, and this evidence record.
+
+### Concerns / ข้อสังเกต
+
+- The CSS cascade is covered statically. Illustrator/CEP rendering was not
+  launched manually for this one-declaration follow-up.

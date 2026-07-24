@@ -125,7 +125,7 @@ h3 { margin: 0 0 8px; font-size: 12px; }
 }
 
 .check-item input { width: auto; margin: 3px 0 0; accent-color: #5ca9ff; }
-.preset-description { min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; }
+.preset-description { min-width: 0; flex: 1 1 auto; margin: 0; overflow-wrap: anywhere; }
 
 .custom-preset-badge {
   flex: 0 0 auto;

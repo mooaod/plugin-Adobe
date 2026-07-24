@@ -57,6 +57,12 @@ test('panel stylesheet defines card, accordion, and semantic status treatments',
   assert.match(compactCss, /\.preflight-summary-row\s*\{[^}]*grid-template-columns:\s*26px\s+1fr;[^}]*font-size:\s*12px/);
 });
 
+test('preset description label preserves compact row spacing', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'client', 'style.css'), 'utf8');
+
+  assert.match(css, /\.preset-description\s*\{[^}]*margin:\s*0;/);
+});
+
 test('panel controller invokes the host rename operation and reports its result', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'client', 'index.js'), 'utf8');
 
