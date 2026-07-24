@@ -64,9 +64,10 @@ function hostCallPayload(call, prefix) {
 }
 
 class FakeElement {
-  constructor(id, tagName) {
+  constructor(id, tagName, ownerDocument) {
     this.id = id || '';
     this.tagName = tagName || 'div';
+    this.ownerDocument = ownerDocument || null;
     this.children = [];
     this.dataset = {};
     this.attributes = {};
@@ -127,7 +128,13 @@ class FakeElement {
   }
 
   focus() {
+    if (this.ownerDocument && this.ownerDocument.activeElement) {
+      this.ownerDocument.activeElement.focused = false;
+    }
     this.focused = true;
+    if (this.ownerDocument) {
+      this.ownerDocument.activeElement = this;
+    }
   }
 }
 
@@ -146,8 +153,25 @@ function fakeDocument() {
     'cancel-delete-preset-button', 'confirm-delete-preset-button'
   ];
   const elements = {};
+  const document = {
+    activeElement: null,
+    elements: elements,
+    getElementById: function (id) { return elements[id] || null; },
+    createElement: function (tagName) {
+      return new FakeElement('', tagName, document);
+    },
+    querySelectorAll: function (selector) {
+      return selector === '.accordion-trigger'
+        ? [
+          elements['presets-trigger'],
+          elements['preflight-trigger'],
+          elements['export-trigger']
+        ]
+        : [];
+    }
+  };
   ids.forEach(function (id) {
-    elements[id] = new FakeElement(id);
+    elements[id] = new FakeElement(id, 'div', document);
   });
   elements['format-select'].value = 'png';
   elements['destination-input'].value = '/exports';
@@ -160,20 +184,7 @@ function fakeDocument() {
   elements['export-body'].hidden = true;
   elements['delete-preset-modal'].hidden = true;
 
-  return {
-    elements: elements,
-    getElementById: function (id) { return elements[id] || null; },
-    createElement: function (tagName) { return new FakeElement('', tagName); },
-    querySelectorAll: function (selector) {
-      return selector === '.accordion-trigger'
-        ? [
-          elements['presets-trigger'],
-          elements['preflight-trigger'],
-          elements['export-trigger']
-        ]
-        : [];
-    }
-  };
+  return document;
 }
 
 function runPanel(options) {
@@ -1671,8 +1682,13 @@ test('shows Custom and Delete only for custom presets', function () {
   const builtInRow = panel.document.elements['preset-list'].children[0];
   const customRow = panel.document.elements['preset-list'].children[1];
   const customPreflightRow = panel.document.elements['preflight-preset-list'].children[1];
+  const customCheckbox = customRow.children[0];
+  const customDescription = customRow.children[1];
 
   assert.equal(builtInRow.children.length, 2);
+  assert.equal(customCheckbox.id, 'preset-checkbox-1');
+  assert.equal(customDescription.tagName, 'label');
+  assert.equal(customDescription.getAttribute('for'), customCheckbox.id);
   assert.equal(customRow.children[2].className, 'custom-preset-badge');
   assert.equal(customRow.children[2].textContent, 'Custom');
   assert.equal(customRow.children[3].className, 'delete-preset-button');
@@ -1724,6 +1740,7 @@ test('deletes a custom preset only after modal confirmation', function () {
   assert.equal(panel.document.elements['delete-preset-modal'].hidden, true);
   assert.equal(panel.document.elements['preset-list'].children.length, 1);
   assert.match(panel.document.elements.status.textContent, /Deleted custom preset Saved Custom/);
+  assert.equal(panel.document.activeElement, panel.document.elements.status);
 });
 
 test('keeps an open custom preset deletion pending while a host operation is busy', function () {
@@ -1801,6 +1818,106 @@ test('Escape cancels custom preset deletion without writing', function () {
   assert.equal(prevented, true);
   assert.equal(panel.document.elements['delete-preset-modal'].hidden, true);
   assert.equal(panel.writes.length, 0);
+});
+
+test('legacy Escape keyCode cancels custom preset deletion without writing', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache', lastSuccessfulCheck: new Date().toISOString()
+    },
+    customState: {
+      schemaVersion: 1,
+      presets: [{ id: 'saved', label: 'Saved Custom', width: 321, height: 654 }]
+    }
+  });
+  let prevented = false;
+
+  panel.document.elements['preset-list'].children[1].children[3].dispatch('click');
+  panel.document.elements['delete-preset-modal'].dispatch('keydown', {
+    keyCode: 27,
+    preventDefault: function () { prevented = true; }
+  });
+
+  assert.equal(prevented, true);
+  assert.equal(panel.document.elements['delete-preset-modal'].hidden, true);
+  assert.equal(panel.writes.length, 0);
+});
+
+test('Tab from Delete wraps focus to Cancel in the delete modal', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache', lastSuccessfulCheck: new Date().toISOString()
+    },
+    customState: {
+      schemaVersion: 1,
+      presets: [{ id: 'saved', label: 'Saved Custom', width: 321, height: 654 }]
+    }
+  });
+  const cancelButton = panel.document.elements['cancel-delete-preset-button'];
+  const deleteButton = panel.document.elements['confirm-delete-preset-button'];
+  let prevented = false;
+
+  panel.document.elements['preset-list'].children[1].children[3].dispatch('click');
+  deleteButton.focus();
+  panel.document.elements['delete-preset-modal'].dispatch('keydown', {
+    key: 'Tab',
+    shiftKey: false,
+    preventDefault: function () { prevented = true; }
+  });
+
+  assert.equal(prevented, true);
+  assert.equal(panel.document.activeElement, cancelButton);
+});
+
+test('legacy Shift+Tab from Cancel wraps focus to Delete in the delete modal', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache', lastSuccessfulCheck: new Date().toISOString()
+    },
+    customState: {
+      schemaVersion: 1,
+      presets: [{ id: 'saved', label: 'Saved Custom', width: 321, height: 654 }]
+    }
+  });
+  const cancelButton = panel.document.elements['cancel-delete-preset-button'];
+  const deleteButton = panel.document.elements['confirm-delete-preset-button'];
+  let prevented = false;
+
+  panel.document.elements['preset-list'].children[1].children[3].dispatch('click');
+  cancelButton.focus();
+  panel.document.elements['delete-preset-modal'].dispatch('keydown', {
+    keyCode: 9,
+    shiftKey: true,
+    preventDefault: function () { prevented = true; }
+  });
+
+  assert.equal(prevented, true);
+  assert.equal(panel.document.activeElement, deleteButton);
+});
+
+test('Tab received with focus outside the delete modal returns focus to Cancel', function () {
+  const panel = runPanel({
+    cacheState: {
+      catalog: catalog(), source: 'cache', lastSuccessfulCheck: new Date().toISOString()
+    },
+    customState: {
+      schemaVersion: 1,
+      presets: [{ id: 'saved', label: 'Saved Custom', width: 321, height: 654 }]
+    }
+  });
+  const cancelButton = panel.document.elements['cancel-delete-preset-button'];
+  let prevented = false;
+
+  panel.document.elements['preset-list'].children[1].children[3].dispatch('click');
+  panel.document.elements.status.focus();
+  panel.document.elements['delete-preset-modal'].dispatch('keydown', {
+    key: 'Tab',
+    shiftKey: false,
+    preventDefault: function () { prevented = true; }
+  });
+
+  assert.equal(prevented, true);
+  assert.equal(panel.document.activeElement, cancelButton);
 });
 
 test('keeps a custom preset when deletion cannot be persisted', function () {

@@ -481,6 +481,9 @@
         }
         renderCatalog(activeBaseCatalog, catalogSource);
         setStatus('Deleted custom preset ' + preset.label + '.');
+        if (status.focus) {
+          status.focus();
+        }
         return true;
       }
     }
@@ -516,16 +519,18 @@
       var preset = activeCatalog.presets[i];
       var label = document.createElement('div');
       var checkbox = document.createElement('input');
-      var description = document.createElement('span');
+      var description = document.createElement('label');
       var preflightLabel = document.createElement('label');
       var preflightCheckbox = document.createElement('input');
       var preflightDescription = document.createElement('span');
       label.className = 'check-item';
       checkbox.type = 'checkbox';
+      checkbox.id = 'preset-checkbox-' + i;
       checkbox.checked = false;
       checkbox.dataset.presetIndex = String(i);
       checkbox.addEventListener('change', updateCreateState);
       description.className = 'preset-description';
+      description.setAttribute('for', checkbox.id);
       description.textContent = preset.label + ' — ' + preset.width + ' × ' + preset.height + ' px';
       checkbox.setAttribute('aria-label', description.textContent);
       label.appendChild(checkbox);
@@ -1251,9 +1256,28 @@
   });
   confirmDeletePresetButton.addEventListener('click', confirmDeletePreset);
   deletePresetModal.addEventListener('keydown', function (event) {
-    if (event.key === 'Escape') {
+    var activeElement;
+    var isTab;
+    if (event.key === 'Escape' || event.keyCode === 27) {
       event.preventDefault();
       closeDeletePresetDialog(true);
+      return;
+    }
+    isTab = event.key === 'Tab' || event.keyCode === 9;
+    if (!isTab) {
+      return;
+    }
+    activeElement = document.activeElement;
+    if (activeElement !== cancelDeletePresetButton &&
+        activeElement !== confirmDeletePresetButton) {
+      event.preventDefault();
+      cancelDeletePresetButton.focus();
+    } else if (event.shiftKey && activeElement === cancelDeletePresetButton) {
+      event.preventDefault();
+      confirmDeletePresetButton.focus();
+    } else if (!event.shiftKey && activeElement === confirmDeletePresetButton) {
+      event.preventDefault();
+      cancelDeletePresetButton.focus();
     }
   });
 

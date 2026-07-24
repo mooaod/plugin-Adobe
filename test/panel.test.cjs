@@ -70,6 +70,7 @@ test('panel controller invokes the host rename operation and reports its result'
 test('panel provides an accessible hidden custom preset delete modal', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'client', 'index.html'), 'utf8');
 
+  assert.match(html, /<p\b(?=[^>]*\bid="status")(?=[^>]*\btabindex="-1")[^>]*>/);
   assert.match(html, /<div\b(?=[^>]*\bid="delete-preset-modal")(?=[^>]*\brole="dialog")(?=[^>]*\baria-modal="true")(?=[^>]*\baria-labelledby="delete-preset-modal-title")(?=[^>]*\baria-describedby="delete-preset-modal-message")(?=[^>]*\bhidden)[^>]*>/);
   assert.match(html, /<h2 id="delete-preset-modal-title">Delete Custom Preset\?<\/h2>/);
   assert.match(html, /<p id="delete-preset-modal-message"><\/p>/);
@@ -79,10 +80,49 @@ test('panel provides an accessible hidden custom preset delete modal', () => {
 
 test('panel stylesheet defines the compact destructive modal treatment', () => {
   const css = fs.readFileSync(path.join(__dirname, '..', 'client', 'style.css'), 'utf8');
+  const overlayCss = css.match(/\.modal-overlay\s*\{([^}]*)\}/);
+  const actionsCss = css.match(/\.modal-actions\s*\{([^}]*)\}/);
 
-  assert.match(css, /\.modal-overlay\s*\{[^}]*position:\s*fixed;[^}]*inset:\s*0;/);
+  assert.ok(overlayCss, 'defines the modal overlay');
+  assert.ok(actionsCss, 'defines the modal actions');
+  assert.match(overlayCss[1], /position:\s*fixed/);
+  assert.match(overlayCss[1], /top:\s*0/);
+  assert.match(overlayCss[1], /right:\s*0/);
+  assert.match(overlayCss[1], /bottom:\s*0/);
+  assert.match(overlayCss[1], /left:\s*0/);
+  assert.match(overlayCss[1], /display:\s*flex/);
+  assert.match(overlayCss[1], /align-items:\s*center/);
+  assert.match(overlayCss[1], /justify-content:\s*center/);
+  assert.doesNotMatch(overlayCss[1], /display:\s*grid/);
+  assert.doesNotMatch(overlayCss[1], /place-items\s*:/);
+  assert.doesNotMatch(overlayCss[1], /\binset\s*:/);
   assert.match(css, /\.modal-overlay\[hidden\]\s*\{[^}]*display:\s*none/);
-  assert.match(css, /\.confirmation-modal\s*\{[^}]*max-width:\s*320px/);
-  assert.match(css, /\.modal-actions\s*\{[^}]*display:\s*flex/);
+  assert.match(css, /\.confirmation-modal\s*\{[^}]*box-sizing:\s*border-box;[^}]*max-width:\s*320px/);
+  assert.match(actionsCss[1], /display:\s*flex/);
+  assert.doesNotMatch(actionsCss[1], /\bgap\s*:/);
+  assert.match(css, /\.modal-actions button \+ button\s*\{[^}]*margin-left:\s*8px/);
   assert.match(css, /button\.destructive\s*\{[^}]*border-color:\s*#b94a4a/);
+});
+
+test('older deletion design points to the superseding in-panel modal design', () => {
+  const design = fs.readFileSync(
+    path.join(
+      __dirname,
+      '..',
+      'docs',
+      'superpowers',
+      'specs',
+      '2026-07-17-custom-preset-deletion-design.md'
+    ),
+    'utf8'
+  );
+
+  assert.match(
+    design,
+    /\]\(\.\/2026-07-24-custom-preset-delete-modal-design\.md\)/
+  );
+  assert.match(design, /แทนที่การยืนยันแบบ native/);
+  assert.match(design, /supersedes native confirmation/);
+  assert.doesNotMatch(design, /ปุ่มจะเรียก\s*`window\.confirm\(\)`/);
+  assert.doesNotMatch(design, /The button calls\s*`window\.confirm\(\)`/);
 });

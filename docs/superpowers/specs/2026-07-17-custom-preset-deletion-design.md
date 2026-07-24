@@ -30,14 +30,18 @@ never show a delete control and remain available after catalog updates.
 ## รูปแบบหน้าจอและข้อมูล / UI and Data Flow
 
 `renderCatalog()` จะรู้ว่ารายการใดเป็น custom จาก custom-preset store ที่อ่าน
-และตรวจสอบแล้ว จึงสร้างปุ่ม Delete บนแถวนั้นเท่านั้น ปุ่มจะเรียก
-`window.confirm()` ก่อนแก้ไข array ในหน่วยความจำ จากนั้นบันทึกด้วย
-`persistCustomPresets()` หากเขียนสำเร็จเท่านั้นจึง render catalog ใหม่
+และตรวจสอบแล้ว จึงสร้างปุ่ม Delete บนแถวนั้นเท่านั้น
+[แบบออกแบบ Modal วันที่ 2026-07-24](./2026-07-24-custom-preset-delete-modal-design.md)
+แทนที่การยืนยันแบบ native ด้วย Modal ภายใน panel ก่อนแก้ไข array ในหน่วยความจำ
+จากนั้นบันทึกด้วย `persistCustomPresets()` หากเขียนสำเร็จเท่านั้นจึง render
+catalog ใหม่
 
 `renderCatalog()` identifies custom rows from the validated custom-preset store
-and renders a Delete button only for those rows. The button calls
-`window.confirm()` before mutating the in-memory array, then persists via
-`persistCustomPresets()`. The catalog re-renders only after a successful write.
+and renders a Delete button only for those rows. The
+[2026-07-24 modal design](./2026-07-24-custom-preset-delete-modal-design.md)
+supersedes native confirmation with an in-panel modal before the in-memory array
+is mutated. The change then persists via `persistCustomPresets()`, and the
+catalog re-renders only after a successful write.
 
 ## ข้อผิดพลาดและความปลอดภัย / Errors and Safety
 
