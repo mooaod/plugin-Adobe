@@ -37,10 +37,15 @@ test('panel stylesheet defines card, accordion, and semantic status treatments',
   assert.match(css, /\.preflight-summary-row\.missing/);
   assert.match(css, /\.preflight-summary-row\.duplicate/);
   assert.match(css, /@media\s*\(max-width:\s*320px\)/);
-  assert.match(css, /grid-template-columns:\s*42px\s+minmax\(0,\s*1fr\)\s+auto/);
+  assert.match(css, /grid-template-columns:\s*30px\s+minmax\(0,\s*1fr\)\s+auto/);
   assert.match(css, /\.preflight-summary-row\s*>\s*:nth-child\(2\)\s*\{[^}]*overflow-wrap:\s*anywhere/);
   assert.match(css, /\.preflight-result\s*\{[^}]*overflow-wrap:\s*anywhere;[^}]*word-break:\s*break-word/);
   assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\.chevron\s*\{[\s\S]*?transition:\s*none/);
+  assert.match(css, /:root\s*\{[^}]*font:\s*13px\/1\.4/);
+  assert.match(css, /h1\s*\{[^}]*font-size:\s*16px/);
+  assert.match(css, /\.accordion-trigger\s*\{[^}]*padding:\s*10px\s+12px;[^}]*font-size:\s*15px/);
+  assert.match(css, /\.panel-card\s*\{[^}]*margin:\s*0\s+0\s+8px;[^}]*border-radius:\s*6px/);
+  assert.match(css, /\.preflight-summary-row\s*\{[^}]*grid-template-columns:\s*30px\s+minmax\(0,\s*1fr\)\s+auto;[^}]*font-size:\s*13px/);
 });
 
 test('panel controller invokes the host rename operation and reports its result', () => {

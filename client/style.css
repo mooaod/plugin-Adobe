@@ -1,6 +1,6 @@
 :root {
   color-scheme: dark;
-  font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #f4f4f4;
   background: #202020;
 }
@@ -16,9 +16,9 @@ select,
 input { box-sizing: border-box; font: inherit; }
 
 button {
-  padding: 10px 14px;
+  padding: 7px 10px;
   border: 1px solid #3d78ba;
-  border-radius: 6px;
+  border-radius: 4px;
   color: #fff;
   background: #1473e6;
   cursor: pointer;
@@ -35,17 +35,17 @@ button:disabled { opacity: .48; cursor: default; }
 select,
 input {
   width: 100%;
-  padding: 9px 10px;
+  padding: 7px 8px;
   border: 1px solid #606060;
-  border-radius: 5px;
+  border-radius: 4px;
   color: #f4f4f4;
   background: #292929;
 }
 
-label { display: block; margin: 12px 0 5px; color: #dedede; }
-h1 { margin: 0; font-size: 24px; line-height: 1.15; }
-h2 { margin: 0 0 10px; font-size: 16px; }
-h3 { margin: 0 0 8px; font-size: 15px; }
+label { display: block; margin: 8px 0 4px; color: #dedede; }
+h1 { margin: 0; font-size: 16px; line-height: 1.15; }
+h2 { margin: 0 0 10px; font-size: 14px; }
+h3 { margin: 0 0 8px; font-size: 12px; }
 
 .panel-shell { padding: 4px; }
 
@@ -53,30 +53,30 @@ h3 { margin: 0 0 8px; font-size: 15px; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 16px 18px;
+  gap: 8px;
+  padding: 10px 12px;
 }
 
 .header-menu {
   box-sizing: border-box;
   display: grid;
-  width: 40px;
-  min-height: 38px;
+  width: 28px;
+  min-height: 28px;
   place-items: center;
-  padding: 2px 6px;
+  padding: 1px 4px;
   border: 1px solid #3f3f3f;
   border-radius: 4px;
   color: #d8d8d8;
   background: transparent;
-  font-size: 24px;
+  font-size: 17px;
   line-height: 1;
 }
 
 .panel-card {
-  margin: 0 0 12px;
+  margin: 0 0 8px;
   overflow: hidden;
   border: 1px solid #4a4a4a;
-  border-radius: 10px;
+  border-radius: 6px;
   background: linear-gradient(135deg, #323232, #252525);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
 }
@@ -86,13 +86,13 @@ h3 { margin: 0 0 8px; font-size: 15px; }
   width: 100%;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  padding: 18px 22px;
+  gap: 10px;
+  padding: 10px 12px;
   border: 0;
   border-radius: 0;
   color: #f4f4f4;
   background: transparent;
-  font-size: 21px;
+  font-size: 15px;
   font-weight: 700;
   text-align: left;
 }
@@ -102,11 +102,11 @@ h3 { margin: 0 0 8px; font-size: 15px; }
 .accordion-trigger:focus-visible { outline: 2px solid #5ca9ff; outline-offset: -4px; }
 
 .chevron {
-  width: 12px;
-  height: 12px;
+  width: 8px;
+  height: 8px;
   flex: 0 0 auto;
-  border-right: 3px solid #ddd;
-  border-bottom: 3px solid #ddd;
+  border-right: 2px solid #ddd;
+  border-bottom: 2px solid #ddd;
   transform: rotate(45deg);
   transition: transform .15s ease;
 }
@@ -117,14 +117,14 @@ h3 { margin: 0 0 8px; font-size: 15px; }
   .chevron { transition: none; }
 }
 
-.accordion-body { padding: 0 22px 22px; }
+.accordion-body { padding: 0 12px 12px; }
 .accordion-body[hidden] { display: none; }
-.card-helper { margin: 8px 0 12px; color: #c8c8c8; }
+.card-helper { margin: 5px 0 8px; color: #c8c8c8; }
 .card-helper.accent { color: #65a9ff; }
 
 .checklist {
-  max-height: 180px;
-  margin: 8px 0 14px;
+  max-height: 150px;
+  margin: 6px 0 10px;
   overflow-y: auto;
   border-top: 1px solid #505050;
 }
@@ -132,9 +132,9 @@ h3 { margin: 0 0 8px; font-size: 15px; }
 .check-item {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 7px;
   margin: 0;
-  padding: 12px 8px;
+  padding: 6px 4px;
   border-bottom: 1px solid #505050;
   color: #ededed;
 }
@@ -146,21 +146,21 @@ h3 { margin: 0 0 8px; font-size: 15px; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .catalog-tools button { flex: 0 1 auto; }
 
 .warning { min-height: 1.4em; margin: 10px 0; color: #ffb95c; }
-.custom-preset-form { margin-top: 16px; padding-top: 16px; border-top: 1px solid #505050; }
+.custom-preset-form { margin-top: 12px; padding-top: 12px; border-top: 1px solid #505050; }
 .dimension-fields { display: flex; gap: 10px; }
 .dimension-fields > div { flex: 1; min-width: 0; }
-.custom-preset-form button { margin-top: 12px; }
+.custom-preset-form button { margin-top: 8px; }
 
 .utility-divider {
   height: 0;
-  margin: 20px 0 14px;
+  margin: 14px 0 10px;
   border: 0;
   border-top: 1px solid #505050;
 }
@@ -169,28 +169,28 @@ h3 { margin: 0 0 8px; font-size: 15px; }
 
 #status {
   min-height: 2.8em;
-  margin: 12px 0 0;
+  margin: 8px 0 0;
   color: #d0d0d0;
 }
 
-.preflight-summary { min-height: 0; margin: 14px 0 0; }
+.preflight-summary { min-height: 0; margin: 10px 0 0; }
 
 .preflight-summary-row {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) auto;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
-  padding: 14px 8px;
+  gap: 8px;
+  padding: 8px 4px;
   border-top: 1px solid #505050;
-  font-size: 18px;
+  font-size: 13px;
 }
 
 .preflight-summary-row > :nth-child(2) { min-width: 0; overflow-wrap: anywhere; }
 
 .preflight-status-icon {
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 22px;
+  height: 22px;
   place-items: center;
   border: 2px solid currentColor;
   border-radius: 50%;
@@ -198,10 +198,10 @@ h3 { margin: 0 0 8px; font-size: 15px; }
 }
 
 .preflight-status-badge {
-  min-width: 116px;
-  padding: 8px 12px;
+  min-width: 78px;
+  padding: 5px 8px;
   border: 1px solid currentColor;
-  border-radius: 7px;
+  border-radius: 4px;
   text-align: center;
 }
 
@@ -212,7 +212,7 @@ h3 { margin: 0 0 8px; font-size: 15px; }
 
 .preflight-result {
   margin: 4px 0;
-  padding: 9px 10px;
+  padding: 5px 7px;
   border-left: 3px solid #777;
   background: rgba(0, 0, 0, .14);
   overflow-wrap: anywhere;
@@ -225,16 +225,16 @@ h3 { margin: 0 0 8px; font-size: 15px; }
 .preflight-result.duplicate { border-color: #c5c5c5; }
 #preflight-results { margin-bottom: 12px; }
 
-.preflight-actions { display: flex; gap: 10px; margin-top: 14px; }
+.preflight-actions { display: flex; gap: 8px; margin-top: 10px; }
 .preflight-actions button { flex: 1 1 0; min-width: 0; }
 
 #export-verified-button { margin-top: 10px; }
 
 @media (max-width: 320px) {
   .panel-header,
-  .accordion-body { padding-left: 14px; padding-right: 14px; }
-  .accordion-trigger { padding: 15px 14px; font-size: 18px; }
-  .preflight-summary-row { grid-template-columns: 32px 1fr; font-size: 15px; }
+  .accordion-body { padding-left: 10px; padding-right: 10px; }
+  .accordion-trigger { padding: 9px 10px; font-size: 14px; }
+  .preflight-summary-row { grid-template-columns: 26px 1fr; font-size: 12px; }
   .preflight-status-badge { grid-column: 2; min-width: 0; }
   .preflight-actions { flex-direction: column; }
   .catalog-tools { align-items: stretch; flex-direction: column; }
