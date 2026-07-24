@@ -103,7 +103,7 @@ are the property of their respective owners.
 
 ## Signed ZXP installation
 
-The signed release is `ArtboardSizeRenamer-v1.0.0-signed.zxp`. Install it with a
+The signed release is `ArtboardSizeRenamer-v1.1.0-signed.zxp`. Install it with a
 ZXP-capable Adobe extension installer, fully quit Illustrator, then reopen
 Illustrator and choose **Window → Extensions → Artboard Size Renamer**. Verify
 the downloaded file against the accompanying `.sha256` file before

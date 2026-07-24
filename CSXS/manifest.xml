@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ExtensionManifest ExtensionBundleId="com.aibd.artboardsizerenamer" ExtensionBundleVersion="1.0.0" Version="7.0">
-  <ExtensionList><Extension Id="com.aibd.artboardsizerenamer.panel" Version="1.0.0" /></ExtensionList>
+<ExtensionManifest ExtensionBundleId="com.aibd.artboardsizerenamer" ExtensionBundleVersion="1.1.0" Version="7.0">
+  <ExtensionList><Extension Id="com.aibd.artboardsizerenamer.panel" Version="1.1.0" /></ExtensionList>
   <ExecutionEnvironment>
     <HostList><Host Name="ILST" Version="19.0" /></HostList>
     <LocaleList><Locale Code="All" /></LocaleList>

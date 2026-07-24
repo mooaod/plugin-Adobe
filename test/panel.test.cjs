@@ -13,11 +13,11 @@ test('panel markup provides accessible independent accordion cards', () => {
   assert.match(html, /<title>Artboard Size Renamer<\/title>/);
 });
 
-test('panel header keeps its decorative menu out of the interaction and accessibility trees', () => {
+test('panel header omits the nonfunctional decorative menu', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'client', 'index.html'), 'utf8');
 
-  assert.match(html, /<span class="header-menu" aria-hidden="true">☰<\/span>/);
-  assert.doesNotMatch(html, /<button class="header-menu"/);
+  assert.doesNotMatch(html, /header-menu/);
+  assert.doesNotMatch(html, /☰/);
 });
 
 test('presets card separates the rename utility with a semantic divider', () => {
@@ -30,7 +30,7 @@ test('panel stylesheet defines card, accordion, and semantic status treatments',
   const css = fs.readFileSync(path.join(__dirname, '..', 'client', 'style.css'), 'utf8');
 
   assert.match(css, /\.panel-card\s*\{/);
-  assert.match(css, /\.header-menu\s*\{(?=[^}]*display:\s*grid;)(?=[^}]*box-sizing:\s*border-box;)[^}]*\}/);
+  assert.doesNotMatch(css, /\.header-menu\s*\{/);
   assert.match(css, /\.accordion-trigger\[aria-expanded="true"\]/);
   assert.match(css, /\.preflight-summary-row\.pass/);
   assert.match(css, /\.preflight-summary-row\.rename/);

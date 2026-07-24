@@ -10,7 +10,7 @@ keychain_service="Moo_Ai Artboard Size Renamer Signing"
 keychain_account="aibd"
 timestamp_url="http://timestamp.digicert.com"
 output_dir="$project_root/releases"
-output_name="ArtboardSizeRenamer-v1.0.0-signed.zxp"
+output_name="ArtboardSizeRenamer-v1.1.0-signed.zxp"
 checksum_name="$output_name.sha256"
 output_zxp="$output_dir/$output_name"
 checksum_path="$output_dir/$checksum_name"
@@ -56,7 +56,7 @@ work_root="$(mktemp -d /private/tmp/artboard-size-renamer-zxp.XXXXXX)"
 expected_allowlist="$work_root/release-files.expected"
 release_allowlist="$project_root/release-files.txt"
 staging_root="$work_root/package"
-temporary_zxp="$work_root/ArtboardSizeRenamer-v1.0.0-signed.zxp"
+temporary_zxp="$work_root/$output_name"
 
 printf '%s\n' \
   CSXS \

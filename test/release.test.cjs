@@ -180,6 +180,7 @@ test('signed release script keeps secrets external and verifies before publishin
   assert.match(script, /\/Users\/aibd\/Library\/Application Support\/Moo_Ai\/ZXPSignCmd\/ZXPSignCmd/);
   assert.match(script, /\/Users\/aibd\/Library\/Application Support\/Moo_Ai\/Signing\/ArtboardSizeRenamer\.p12/);
   assert.match(script, /timestamp_url="http:\/\/timestamp\.digicert\.com"/);
+  assert.match(script, /output_name="ArtboardSizeRenamer-v1\.1\.0-signed\.zxp"/);
   assert.match(script, /-tsa "\$timestamp_url"/);
   assert.match(script, /LICENSE/);
   assert.match(script, /THIRD_PARTY_NOTICES\.md/);
@@ -237,7 +238,7 @@ test('release build does not publish when signing fails', () => {
 
   try {
     assert.equal(result.status, 42);
-    assert.equal(fs.existsSync(path.join(fixtureRoot, 'releases', 'ArtboardSizeRenamer-v1.0.0-signed.zxp')), false);
+    assert.equal(fs.existsSync(path.join(fixtureRoot, 'releases', 'ArtboardSizeRenamer-v1.1.0-signed.zxp')), false);
   } finally {
     fs.rmSync(fixtureRoot, { recursive: true, force: true });
   }
@@ -248,7 +249,7 @@ test('release build does not publish when verification fails', () => {
 
   try {
     assert.equal(result.status, 43);
-    assert.equal(fs.existsSync(path.join(fixtureRoot, 'releases', 'ArtboardSizeRenamer-v1.0.0-signed.zxp')), false);
+    assert.equal(fs.existsSync(path.join(fixtureRoot, 'releases', 'ArtboardSizeRenamer-v1.1.0-signed.zxp')), false);
   } finally {
     fs.rmSync(fixtureRoot, { recursive: true, force: true });
   }
@@ -259,18 +260,18 @@ test('successful release writes a portable basename-only checksum', () => {
   const checksumPath = path.join(
     fixtureRoot,
     'releases',
-    'ArtboardSizeRenamer-v1.0.0-signed.zxp.sha256'
+    'ArtboardSizeRenamer-v1.1.0-signed.zxp.sha256'
   );
 
   try {
     assert.equal(result.status, 0, result.stderr);
     assert.equal(
-      fs.existsSync(path.join(fixtureRoot, 'releases', 'ArtboardSizeRenamer-v1.0.0-signed.zxp')),
+      fs.existsSync(path.join(fixtureRoot, 'releases', 'ArtboardSizeRenamer-v1.1.0-signed.zxp')),
       true
     );
     assert.match(
       fs.readFileSync(checksumPath, 'utf8'),
-      /^[a-f0-9]{64}  ArtboardSizeRenamer-v1\.0\.0-signed\.zxp\n$/
+      /^[a-f0-9]{64}  ArtboardSizeRenamer-v1\.1\.0-signed\.zxp\n$/
     );
   } finally {
     fs.rmSync(fixtureRoot, { recursive: true, force: true });
@@ -283,4 +284,5 @@ test('release artifacts are ignored and signed installation is documented', () =
 
   assert.match(gitignore, /^\/releases\/$/m);
   assert.match(readme, /Signed ZXP installation/);
+  assert.match(readme, /ArtboardSizeRenamer-v1\.1\.0-signed\.zxp/);
 });

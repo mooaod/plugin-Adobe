@@ -95,6 +95,8 @@ test('ships transparent dark-panel icon backgrounds with a visible light glyph',
 
 test('registers an Illustrator CEP panel', () => {
   const manifest = fs.readFileSync('CSXS/manifest.xml', 'utf8');
+  assert.match(manifest, /ExtensionBundleVersion="1\.1\.0"/);
+  assert.match(manifest, /Extension Id="com\.aibd\.artboardsizerenamer\.panel" Version="1\.1\.0"/);
   assert.match(manifest, /Host Name="ILST" Version="19\.0"/);
   assert.match(manifest, /<ScriptPath>\.\/host\/rename-artboards\.jsx<\/ScriptPath>/);
   assert.match(manifest, /<Type>Panel<\/Type>/);
