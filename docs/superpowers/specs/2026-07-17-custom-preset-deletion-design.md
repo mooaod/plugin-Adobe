@@ -11,6 +11,7 @@ never show a delete control and remain available after catalog updates.
 ## ขอบเขต / Scope
 
 - แสดงปุ่ม **Delete / ลบ** เฉพาะแถวของ Custom Preset
+- แสดงป้าย **Custom** บนแถวเดียวกัน เพื่อแยกจาก preset มาตรฐานอย่างชัดเจน
 - เมื่อกดปุ่ม ให้ถามยืนยันด้วยชื่อ preset ก่อนลบ
 - เมื่อตอบยืนยัน ให้ลบ preset จากไฟล์ `social-presets-custom.json` ในพื้นที่ข้อมูล
   ผู้ใช้ แล้วแสดงรายการใหม่ทันที
@@ -18,6 +19,8 @@ never show a delete control and remain available after catalog updates.
 - ไม่เพิ่มความสามารถลบ ซ่อน หรือแก้ไข preset มาตรฐานในงานนี้
 
 - Show a **Delete / ลบ** button only on Custom Preset rows.
+- Show a **Custom** badge on the same row so it is clearly distinct from
+  built-in presets.
 - Clicking it asks for confirmation naming the preset.
 - After confirmation, remove the preset from `social-presets-custom.json` in the
   user-data area and immediately re-render the list.

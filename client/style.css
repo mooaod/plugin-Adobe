@@ -125,6 +125,28 @@ h3 { margin: 0 0 8px; font-size: 12px; }
 }
 
 .check-item input { width: auto; margin: 3px 0 0; accent-color: #5ca9ff; }
+.preset-description { min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; }
+
+.custom-preset-badge {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  border: 1px solid #666;
+  border-radius: 3px;
+  color: #bbb;
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.delete-preset-button {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-color: #8a4b4b;
+  color: #ffb4b4;
+  background: transparent;
+  font-size: 11px;
+}
+
+.delete-preset-button:not(:disabled):hover { background: #5a2f2f; }
 .meta { color: #aaa; font-size: 12px; text-align: right; }
 
 .catalog-tools {
