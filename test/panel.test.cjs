@@ -46,6 +46,13 @@ test('panel stylesheet defines card, accordion, and semantic status treatments',
   assert.match(css, /\.accordion-trigger\s*\{[^}]*padding:\s*10px\s+12px;[^}]*font-size:\s*15px/);
   assert.match(css, /\.panel-card\s*\{[^}]*margin:\s*0\s+0\s+8px;[^}]*border-radius:\s*6px/);
   assert.match(css, /\.preflight-summary-row\s*\{[^}]*grid-template-columns:\s*30px\s+minmax\(0,\s*1fr\)\s+auto;[^}]*font-size:\s*13px/);
+
+  const compactMedia = css.match(/@media\s*\(max-width:\s*320px\)\s*\{([\s\S]*?)\n\}/);
+  assert.ok(compactMedia, 'defines a compact 320px media block');
+  const compactCss = compactMedia[1];
+  assert.match(compactCss, /\.panel-header,\s*\.accordion-body\s*\{[^}]*padding-left:\s*10px;[^}]*padding-right:\s*10px/);
+  assert.match(compactCss, /\.accordion-trigger\s*\{[^}]*padding:\s*9px\s+10px;[^}]*font-size:\s*14px/);
+  assert.match(compactCss, /\.preflight-summary-row\s*\{[^}]*grid-template-columns:\s*26px\s+1fr;[^}]*font-size:\s*12px/);
 });
 
 test('panel controller invokes the host rename operation and reports its result', () => {
