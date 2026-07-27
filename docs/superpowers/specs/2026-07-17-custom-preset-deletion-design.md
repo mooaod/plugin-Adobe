@@ -11,6 +11,7 @@ never show a delete control and remain available after catalog updates.
 ## ขอบเขต / Scope
 
 - แสดงปุ่ม **Delete / ลบ** เฉพาะแถวของ Custom Preset
+- แสดงป้าย **Custom** บนแถวเดียวกัน เพื่อแยกจาก preset มาตรฐานอย่างชัดเจน
 - เมื่อกดปุ่ม ให้ถามยืนยันด้วยชื่อ preset ก่อนลบ
 - เมื่อตอบยืนยัน ให้ลบ preset จากไฟล์ `social-presets-custom.json` ในพื้นที่ข้อมูล
   ผู้ใช้ แล้วแสดงรายการใหม่ทันที
@@ -18,6 +19,8 @@ never show a delete control and remain available after catalog updates.
 - ไม่เพิ่มความสามารถลบ ซ่อน หรือแก้ไข preset มาตรฐานในงานนี้
 
 - Show a **Delete / ลบ** button only on Custom Preset rows.
+- Show a **Custom** badge on the same row so it is clearly distinct from
+  built-in presets.
 - Clicking it asks for confirmation naming the preset.
 - After confirmation, remove the preset from `social-presets-custom.json` in the
   user-data area and immediately re-render the list.
@@ -27,14 +30,18 @@ never show a delete control and remain available after catalog updates.
 ## รูปแบบหน้าจอและข้อมูล / UI and Data Flow
 
 `renderCatalog()` จะรู้ว่ารายการใดเป็น custom จาก custom-preset store ที่อ่าน
-และตรวจสอบแล้ว จึงสร้างปุ่ม Delete บนแถวนั้นเท่านั้น ปุ่มจะเรียก
-`window.confirm()` ก่อนแก้ไข array ในหน่วยความจำ จากนั้นบันทึกด้วย
-`persistCustomPresets()` หากเขียนสำเร็จเท่านั้นจึง render catalog ใหม่
+และตรวจสอบแล้ว จึงสร้างปุ่ม Delete บนแถวนั้นเท่านั้น
+[แบบออกแบบ Modal วันที่ 2026-07-24](./2026-07-24-custom-preset-delete-modal-design.md)
+แทนที่การยืนยันแบบ native ด้วย Modal ภายใน panel ก่อนแก้ไข array ในหน่วยความจำ
+จากนั้นบันทึกด้วย `persistCustomPresets()` หากเขียนสำเร็จเท่านั้นจึง render
+catalog ใหม่
 
 `renderCatalog()` identifies custom rows from the validated custom-preset store
-and renders a Delete button only for those rows. The button calls
-`window.confirm()` before mutating the in-memory array, then persists via
-`persistCustomPresets()`. The catalog re-renders only after a successful write.
+and renders a Delete button only for those rows. The
+[2026-07-24 modal design](./2026-07-24-custom-preset-delete-modal-design.md)
+supersedes native confirmation with an in-panel modal before the in-memory array
+is mutated. The change then persists via `persistCustomPresets()`, and the
+catalog re-renders only after a successful write.
 
 ## ข้อผิดพลาดและความปลอดภัย / Errors and Safety
 

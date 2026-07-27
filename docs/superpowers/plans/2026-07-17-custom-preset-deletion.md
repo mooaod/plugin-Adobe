@@ -11,6 +11,7 @@
 ## Global Constraints / ข้อกำหนดรวม
 
 - Delete applies only to entries stored in `social-presets-custom.json`.
+- Custom rows display a **Custom** badge beside their Delete action.
 - Built-in and downloaded catalog presets never render a Delete control.
 - Confirmation must name the custom preset; cancelling writes no data.
 - A failed custom-store write restores memory and the rendered list.
@@ -22,7 +23,8 @@
 ## File Structure / โครงสร้างไฟล์
 
 - `client/index.html`: no new form fields; existing preset list remains the rendering target.
-- `client/style.css`: styles the compact Delete action on a custom-preset row.
+- `client/style.css`: styles the compact Custom badge and Delete action on a
+  custom-preset row.
 - `client/index.js`: determines whether a rendered preset is custom, confirms deletion, persists it, and re-renders only on success.
 - `test/panel-workflow.test.cjs`: fake-panel tests for custom-only visibility, confirmation, cancellation, successful persistence, and write failure.
 
@@ -35,7 +37,8 @@
 
 **Interfaces:**
 - Consumes: `customPresets`, `activeBaseCatalog`, `catalogSource`, and `persistCustomPresets()`.
-- Produces: `isCustomPreset(preset)`, `deleteCustomPreset(preset)`, and a `button` rendered only for custom rows.
+- Produces: `isCustomPreset(preset)`, `deleteCustomPreset(preset)`, a **Custom**
+  badge, and a `button` rendered only for custom rows.
 - `deleteCustomPreset(preset)` preserves state if confirmation is declined or persistence fails.
 
 - [ ] **Step 1: Write failing tests / เขียน test ที่ต้อง fail ก่อน**

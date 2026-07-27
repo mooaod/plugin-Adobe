@@ -21,7 +21,7 @@
           <p class="card-helper">Required delivery sizes</p>
           <div id="preset-list" class="checklist"></div>
           <button id="create-presets-button" type="button" disabled>Create Selected Presets</button>
-          <p id="status" role="status" aria-live="polite">Ready</p>
+          <p id="status" role="status" aria-live="polite" tabindex="-1">Ready</p>
           <div class="catalog-tools">
             <span id="catalog-info" class="meta">Loading presets…</span>
             <button id="update-presets-button" class="secondary" type="button">Check Preset Updates</button>
@@ -79,6 +79,18 @@
         </div>
       </section>
     </main>
+    <div id="delete-preset-modal" class="modal-overlay" role="dialog"
+      aria-modal="true" aria-labelledby="delete-preset-modal-title"
+      aria-describedby="delete-preset-modal-message" hidden>
+      <div class="confirmation-modal">
+        <h2 id="delete-preset-modal-title">Delete Custom Preset?</h2>
+        <p id="delete-preset-modal-message"></p>
+        <div class="modal-actions">
+          <button id="cancel-delete-preset-button" class="secondary" type="button">Cancel</button>
+          <button id="confirm-delete-preset-button" class="destructive" type="button">Delete</button>
+        </div>
+      </div>
+    </div>
     <script src="CSInterface.js"></script>
     <script src="catalog.js"></script>
     <script src="export-model.js"></script>

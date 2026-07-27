@@ -20,6 +20,10 @@
   var customPresetWidth = document.getElementById('custom-preset-width');
   var customPresetHeight = document.getElementById('custom-preset-height');
   var addCustomPresetButton = document.getElementById('add-custom-preset-button');
+  var deletePresetModal = document.getElementById('delete-preset-modal');
+  var deletePresetModalMessage = document.getElementById('delete-preset-modal-message');
+  var cancelDeletePresetButton = document.getElementById('cancel-delete-preset-button');
+  var confirmDeletePresetButton = document.getElementById('confirm-delete-preset-button');
   var preflightPresetList = document.getElementById('preflight-preset-list');
   var runPreflightButton = document.getElementById('run-preflight-button');
   var preflightSummary = document.getElementById('preflight-summary');
@@ -34,6 +38,7 @@
   var catalogSource = 'bundled';
   var artboards = [];
   var presetCheckboxes = [];
+  var deletePresetButtons = [];
   var preflightCheckboxes = [];
   var artboardCheckboxes = [];
   var preflightReport = null;
@@ -42,6 +47,8 @@
   var hostLoadError = '';
   var cachedState = readCache();
   var customPresets = readCustomPresets();
+  var pendingDeletePreset = null;
+  var pendingDeleteTrigger = null;
 
   function initializeAccordions() {
     var triggers = document.querySelectorAll
@@ -248,6 +255,9 @@
     for (i = 0; i < presetCheckboxes.length; i += 1) {
       presetCheckboxes[i].disabled = disabled;
     }
+    for (i = 0; i < deletePresetButtons.length; i += 1) {
+      deletePresetButtons[i].disabled = disabled;
+    }
     for (i = 0; i < preflightCheckboxes.length; i += 1) {
       preflightCheckboxes[i].disabled = disabled;
     }
@@ -424,32 +434,129 @@
     }
   }
 
+  function isCustomPreset(preset) {
+    var i;
+    for (i = 0; i < customPresets.length; i += 1) {
+      if (customPresets[i].id === preset.id) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function closeDeletePresetDialog(restoreFocus) {
+    var trigger = pendingDeleteTrigger;
+    pendingDeletePreset = null;
+    pendingDeleteTrigger = null;
+    deletePresetModal.hidden = true;
+    if (restoreFocus && trigger && trigger.focus) {
+      trigger.focus();
+    }
+  }
+
+  function openDeletePresetDialog(preset, trigger) {
+    if (operationBusy()) {
+      updateOperationState();
+      return;
+    }
+    pendingDeletePreset = preset;
+    pendingDeleteTrigger = trigger;
+    deletePresetModalMessage.textContent =
+      'Delete custom preset "' + preset.label + '"? This cannot be undone.';
+    deletePresetModal.hidden = false;
+    if (cancelDeletePresetButton.focus) {
+      cancelDeletePresetButton.focus();
+    }
+  }
+
+  function deleteCustomPreset(preset) {
+    var index;
+    for (index = 0; index < customPresets.length; index += 1) {
+      if (customPresets[index].id === preset.id) {
+        customPresets.splice(index, 1);
+        if (!persistCustomPresets()) {
+          customPresets.splice(index, 0, preset);
+          setStatus('Could not delete the custom preset.');
+          return false;
+        }
+        renderCatalog(activeBaseCatalog, catalogSource);
+        setStatus('Deleted custom preset ' + preset.label + '.');
+        if (status.focus) {
+          status.focus();
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function confirmDeletePreset() {
+    var preset = pendingDeletePreset;
+    var trigger = pendingDeleteTrigger;
+    if (operationBusy()) {
+      updateOperationState();
+      return;
+    }
+    closeDeletePresetDialog(false);
+    if (preset && !deleteCustomPreset(preset) && trigger && trigger.focus) {
+      trigger.focus();
+    }
+  }
+
   function renderCatalog(catalog, source) {
     var i;
+    var pendingDeletePresetFound = false;
     activeBaseCatalog = catalog;
     activeCatalog = mergeCatalogWithCustom(catalog, customPresets);
     catalogSource = source;
     presetCheckboxes = [];
+    deletePresetButtons = [];
     preflightCheckboxes = [];
     clearElement(presetList);
     clearElement(preflightPresetList);
 
     for (i = 0; i < activeCatalog.presets.length; i += 1) {
       var preset = activeCatalog.presets[i];
-      var label = document.createElement('label');
+      var label = document.createElement('div');
       var checkbox = document.createElement('input');
-      var description = document.createElement('span');
+      var description = document.createElement('label');
       var preflightLabel = document.createElement('label');
       var preflightCheckbox = document.createElement('input');
       var preflightDescription = document.createElement('span');
       label.className = 'check-item';
       checkbox.type = 'checkbox';
+      checkbox.id = 'preset-checkbox-' + i;
       checkbox.checked = false;
       checkbox.dataset.presetIndex = String(i);
       checkbox.addEventListener('change', updateCreateState);
+      description.className = 'preset-description';
+      description.setAttribute('for', checkbox.id);
       description.textContent = preset.label + ' — ' + preset.width + ' × ' + preset.height + ' px';
+      checkbox.setAttribute('aria-label', description.textContent);
       label.appendChild(checkbox);
       label.appendChild(description);
+      if (isCustomPreset(preset)) {
+        var customBadge = document.createElement('span');
+        var deleteButton = document.createElement('button');
+        customBadge.className = 'custom-preset-badge';
+        customBadge.textContent = 'Custom';
+        deleteButton.type = 'button';
+        deleteButton.className = 'delete-preset-button';
+        deleteButton.textContent = 'Delete';
+        deleteButton.setAttribute('aria-label', 'Delete custom preset ' + preset.label);
+        deleteButton.addEventListener('click', (function (customPreset) {
+          return function () {
+            openDeletePresetDialog(customPreset, this);
+          };
+        }(preset)));
+        label.appendChild(customBadge);
+        label.appendChild(deleteButton);
+        deletePresetButtons.push(deleteButton);
+        if (pendingDeletePreset && pendingDeletePreset.id === preset.id) {
+          pendingDeleteTrigger = deleteButton;
+          pendingDeletePresetFound = true;
+        }
+      }
       presetList.appendChild(label);
       presetCheckboxes.push(checkbox);
       preflightLabel.className = 'check-item';
@@ -463,6 +570,9 @@
       preflightLabel.appendChild(preflightDescription);
       preflightPresetList.appendChild(preflightLabel);
       preflightCheckboxes.push(preflightCheckbox);
+    }
+    if (pendingDeletePreset && !pendingDeletePresetFound) {
+      closeDeletePresetDialog(false);
     }
     clearPreflightReport();
     updateOperationState();
@@ -1140,6 +1250,35 @@
   destinationInput.addEventListener('input', function () {
     updateExportState();
     updatePreflightState();
+  });
+  cancelDeletePresetButton.addEventListener('click', function () {
+    closeDeletePresetDialog(true);
+  });
+  confirmDeletePresetButton.addEventListener('click', confirmDeletePreset);
+  deletePresetModal.addEventListener('keydown', function (event) {
+    var activeElement;
+    var isTab;
+    if (event.key === 'Escape' || event.keyCode === 27) {
+      event.preventDefault();
+      closeDeletePresetDialog(true);
+      return;
+    }
+    isTab = event.key === 'Tab' || event.keyCode === 9;
+    if (!isTab) {
+      return;
+    }
+    activeElement = document.activeElement;
+    if (activeElement !== cancelDeletePresetButton &&
+        activeElement !== confirmDeletePresetButton) {
+      event.preventDefault();
+      cancelDeletePresetButton.focus();
+    } else if (event.shiftKey && activeElement === cancelDeletePresetButton) {
+      event.preventDefault();
+      confirmDeletePresetButton.focus();
+    } else if (!event.shiftKey && activeElement === confirmDeletePresetButton) {
+      event.preventDefault();
+      cancelDeletePresetButton.focus();
+    }
   });
 
   initializeAccordions();
